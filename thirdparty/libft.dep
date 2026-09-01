@@ -1,0 +1,18 @@
+LIBA_libft          := libft.a
+INCDIR_libft        := libft/include
+LIBDIR_libft        := libft
+DEP_LD_LIBS_libft   :=
+
+LIBFT_DIR           := $(THIRDPARTY)/libft
+
+MAKE_RULE_libft:
+	$(call bcmd,make,$(LIBFT_DIR),$(MAKE) -C $(LIBFT_DIR))
+
+CLEAN_RULE_libft:
+	$(call qcmd,$(MAKE) -C $(LIBFT_DIR) clean)
+
+
+FCLEAN_RULE_libft:
+	$(call qcmd,$(MAKE) -C $(LIBFT_DIR) fclean)
+
+.PHONY: MAKE_RULE_libft CLEAN_RULE_libft FCLEAN_RULE_libft

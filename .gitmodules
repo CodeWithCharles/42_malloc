@@ -1,0 +1,3 @@
+[submodule "thirdparty/libft"]
+	path = thirdparty/libft
+	url = git@github.com:CodeWithCharles/42_libft_full

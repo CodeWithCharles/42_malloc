@@ -1,0 +1,14 @@
+# build system
+Makefile.cfg
+
+# artefacts
+build/
+*.o
+*.d
+*.a
+*.so
+libft_malloc*
+
+# editeur
+.cache/
+compile_commands.json

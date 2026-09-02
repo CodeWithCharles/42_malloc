@@ -1,28 +1,23 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_malloc.h                                        :+:      :+:    :+:   */
+/*   fake_port.h                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/09/01 17:12:03 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:37:16 by cpoulain         ###   ########.fr       */
+/*   Created: 2026/09/02 14:28:06 by cpoulain          #+#    #+#             */
+/*   Updated: 2026/09/02 15:37:04 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef FT_MALLOC_H
-# define FT_MALLOC_H
+#ifndef FAKE_PORT_H
+# define FAKE_PORT_H
 
-# include <stddef.h>
+# include "ftm_stdint.h"
 
-# define FTM_PUBLIC __attribute__((visibility("default")))
-
-FTM_PUBLIC void *malloc(size_t size);
-FTM_PUBLIC void free(void *ptr);
-FTM_PUBLIC void *realloc(void *ptr, size_t size);
-FTM_PUBLIC void *calloc(size_t nmemb, size_t size);
-
-FTM_PUBLIC void show_alloc_mem(void);
-FTM_PUBLIC void show_alloc_mem_ex(void);
+void    fake_port_reset(void);
+void    fake_port_fail_after(int successful_maps);
+size_t  fake_port_map_count(void);
+size_t  fake_port_unmap_count(void);
 
 #endif

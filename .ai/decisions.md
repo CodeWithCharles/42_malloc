@@ -56,7 +56,7 @@ construction. Re-tuner `n`/`m` en phase 13 ne peut pas casser la conformité.
 
 ## D6 — Les hooks de bonus existent dès la phase 5 (2026-09-01)
 **Décision.** `ftm_lock()`/`ftm_unlock()` et les hooks `ftm_on_alloc/on_free/on_error`
-sont appelés depuis `ftm_arena.c` dès la première version, alors qu'ils ne font rien.
+sont appelés depuis `ftm_heap.c` dès la première version, alors qu'ils ne font rien.
 
 **Pourquoi.** Les bonus B1 (thread-safe) et B2 (env vars) deviennent le remplacement d'une
 implémentation, pas une chirurgie dans tout le code.
@@ -110,7 +110,7 @@ laisse en prime la porte ouverte à un environnement où `size_t` est défini au
 
 ## D10 — Initialisation paresseuse, pas de constructeur ELF (2026-09-01)
 **Décision.** Pas de `__attribute__((constructor))`. L'arena s'initialise au premier appel,
-sous lock, via un drapeau `g_arena.initialized`.
+sous lock, via un drapeau `g_heap.initialized`.
 
 **Pourquoi.** En `LD_PRELOAD`, l'ordre des constructeurs entre bibliothèques n'est pas
 garanti : `malloc` peut être appelé par le loader ou par le constructeur d'une autre lib
@@ -122,7 +122,7 @@ donc récursion infinie. D'où `ftm_fmt.c` (formatage maison) + `ftm_write` → 
 ---
 
 ## D11 — L'arena est un paramètre, pas un `static` implicite (2026-09-01)
-**Décision.** En interne, `ftm_alloc(t_arena *a, size_t n)`. Le `static t_arena g_arena`
+**Décision.** En interne, `ftm_alloc(t_heap *a, size_t n)`. Le `static t_heap g_heap`
 du shim reste l'unique instance exposée.
 
 **Pourquoi.** Testabilité : chaque test unitaire travaille sur une **arena neuve et
@@ -198,3 +198,16 @@ qui « crient » leur intention. Les rares commentaires restants sont en anglais
 Charles décide de les garder ou non ; ils ne sont pas un critère de validation. Les
 extraits privilégient donc des noms parlants (`ftm_block_split`, `zone_is_fully_free`,
 `round_up_to_alignment`) plutôt que des blocs de commentaires.
+
+---
+
+## D15 — Nommage : `t_heap`, `FTM_*_HEADER_SIZE`, préfixe FTM (2026-09-01)
+**Décision.** Le conteneur global (les 3 listes de zones + état) s'appelle **`t_heap`**
+(`s_heap`, instance `g_heap`), pas `t_heap`. Les tailles d'en-tête s'écrivent en clair :
+`FTM_BLOCK_HEADER_SIZE`, `FTM_ZONE_HEADER_SIZE` (fini `HDR`). Le vérificateur devient
+`ftm_check_heap`. Préfixe `FTM`/`ftm_` = ft_malloc, sur tout symbole interne.
+
+**Pourquoi.** « arena » traîne deux faux sens : le multi-arena de la glibc (plusieurs
+contextes par thread — on n'en a qu'un) et l'idiome « un gros bloc qu'on double ». `t_heap`
+dit ce que c'est sans ambiguïté. `HDR` violait D14 (les noms doivent crier). Remplace la
+terminologie de [[D11]] (`t_heap` → `t_heap`) et [[D8]] (garde `ftm_*` pour les tests).

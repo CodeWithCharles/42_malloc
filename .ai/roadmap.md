@@ -19,15 +19,15 @@
 | 1 | `void *malloc(size_t)`, `void free(void*)`, `void *realloc(void*, size_t)` | `src/malloc.c` (shim mince) |
 | 2 | `mmap(2)` / `munmap(2)` **uniquement** | `port/ftm_port_posix.c` |
 | 3 | Zéro `malloc` libc en interne | par construction : `core/` ne linke rien |
-| 4 | Zones TINY/SMALL pré-allouées, minimiser `mmap`/`munmap` | `core/ftm_arena.c` |
+| 4 | Zones TINY/SMALL pré-allouées, minimiser `mmap`/`munmap` | `core/ftm_heap.c` |
 | 5 | Taille de zone = multiple de `sysconf(_SC_PAGESIZE)` | `core/ftm_config.h` |
 | 6 | ≥ 100 allocations par zone | `ftm_config.h` (**calculé**, pas écrit en dur) |
-| 7 | TINY `1..n` → zones `N` ; SMALL `n+1..m` → zones `M` ; LARGE `>m` → mmap dédié | `core/ftm_arena.c` |
+| 7 | TINY `1..n` → zones `N` ; SMALL `n+1..m` → zones `M` ; LARGE `>m` → mmap dédié | `core/ftm_heap.c` |
 | 8 | `n, m, N, M` choisis et justifiables | `.ai/decisions.md` |
 | 9 | `show_alloc_mem()` trié par adresses croissantes | `core/ftm_show.c` |
 | 10 | Mémoire **alignée** | `core/ftm_align.h` |
 | 11 | Jamais d'UB, jamais de segv | `core/ftm_guard.c` + tests |
-| 12 | 1 variable globale (+1 pour le thread-safe) | `g_arena` dans `ftm_arena.c` |
+| 12 | 1 variable globale (+1 pour le thread-safe) | `g_heap` dans `ftm_heap.c` |
 | 13 | Code propre même sans Norme — *« if it's ugly you will get 0 »* | review continue |
 | 14 | `libft_malloc_$HOSTTYPE.so` + symlink `libft_malloc.so` | `Makefile` |
 | 15 | Makefile avec règles usuelles, recompilation incrémentale | `Makefile` |
@@ -40,8 +40,8 @@ Fonctions autorisées dans la partie obligatoire : `mmap`, `munmap`, `sysconf(_S
 | # | Bonus | Décision anticipée |
 |---|---|---|
 | B1 | Thread-safe (pthread) | `ftm_lock()`/`ftm_unlock()` dans le contrat de port **dès la phase 1**, implémentés en no-op, puis en `pthread_mutex`. Aucun `#ifdef THREAD_SAFE` disséminé. |
-| B2 | Variables d'env de debug | Hooks `ftm_on_alloc/on_free/on_error` appelés depuis `ftm_arena.c` **dès la phase 5**, vides au début. |
-| B3 | `show_alloc_mem_ex()` : historique + hexdump | `ftm_show.c` séparé de `ftm_arena.c` dès la phase 8 ; l'historique consomme les hooks B2. |
+| B2 | Variables d'env de debug | Hooks `ftm_on_alloc/on_free/on_error` appelés depuis `ftm_heap.c` **dès la phase 5**, vides au début. |
+| B3 | `show_alloc_mem_ex()` : historique + hexdump | `ftm_show.c` séparé de `ftm_heap.c` dès la phase 8 ; l'historique consomme les hooks B2. |
 | B4 | « Défragmentation » | **Non-négociable dès la phase 4** : liste de blocs doublement chaînée **en ordre d'adresse**, blocs alloués compris. Coalescing en O(1). Non-rétrofittable. |
 
 > ⚠️ *« The bonus part will only be assessed if the mandatory part is PERFECT. »*
@@ -154,8 +154,8 @@ réellement débuggables.
 #define FTM_ALIGNMENT     (2 * sizeof(void *))                          /* 16 sur x86-64 */
 #define FTM_ALIGN_UP(x,a) (((x) + ((a) - 1)) & ~((a) - 1))
 
-#define FTM_BLOCK_HDR     FTM_ALIGN_UP(sizeof(t_block), FTM_ALIGNMENT)  /* 32 */
-#define FTM_ZONE_HDR      FTM_ALIGN_UP(sizeof(t_zone),  FTM_ALIGNMENT)  /* 32 */
+#define FTM_BLOCK_HEADER_SIZE     FTM_ALIGN_UP(sizeof(t_block), FTM_ALIGNMENT)  /* 32 */
+#define FTM_ZONE_HEADER_SIZE      FTM_ALIGN_UP(sizeof(t_zone),  FTM_ALIGNMENT)  /* 32 */
 
 #define FTM_TINY_MAX      128     /* n */
 #define FTM_SMALL_MAX     1024    /* m */
@@ -163,7 +163,7 @@ réellement débuggables.
 
 /* N et M : calculés au runtime, car dépendants de ftm_page_size() */
 #define FTM_ZONE_SIZE(maxalloc, pagesz) \
-    FTM_ALIGN_UP(FTM_ZONE_HDR + FTM_MIN_ALLOCS * (FTM_BLOCK_HDR + (maxalloc)), (pagesz))
+    FTM_ALIGN_UP(FTM_ZONE_HEADER_SIZE + FTM_MIN_ALLOCS * (FTM_BLOCK_HEADER_SIZE + (maxalloc)), (pagesz))
 ```
 
 Valeurs résultantes sur x86-64 / page 4096 :
@@ -184,7 +184,7 @@ Valeurs résultantes sur x86-64 / page 4096 :
   casser la conformité. C'est un vrai point de défense.
 
 ⚠️ Aucune de ces valeurs ailleurs que dans `ftm_config.h`. Un `_Static_assert` vérifiera
-`FTM_BLOCK_HDR % FTM_ALIGNMENT == 0` en phase 3.
+`FTM_BLOCK_HEADER_SIZE % FTM_ALIGNMENT == 0` en phase 3.
 
 ---
 
@@ -234,14 +234,14 @@ explicitement autorisé par le sujet et suffit. Cf. §8.)*
 │   ├── ft_malloc.h             #   API publique
 │   ├── ftm_port.h              #   le contrat (9 fonctions)
 │   ├── ftm_config.h            #   n, m, N, M, alignement — tout derive
-│   ├── ftm_types.h             #   t_block, t_zone, t_arena, flags
+│   ├── ftm_types.h             #   t_block, t_zone, t_heap, flags
 │   ├── ftm_internal.h          #   prototypes internes
 │   └── ftm_stdint.h            #   indirection vers <stdint.h> (cf. D9)
 │
 ├── src/
 │   ├── malloc.c                #   shim : malloc/free/realloc/calloc → core
 │   ├── core/                   # ⭐ algo pur · zero libc · zero syscall · zero printf
-│   │   ├── ftm_align.c  ftm_block.c  ftm_zone.c  ftm_arena.c
+│   │   ├── ftm_align.c  ftm_block.c  ftm_zone.c  ftm_heap.c
 │   │   ├── ftm_guard.c  ftm_debug.c  ftm_history.c
 │   │   ├── ftm_fmt.c   ftm_show.c   ftm_check.c
 │   ├── port/                   #   seule couche qui touche l'OS
@@ -256,7 +256,7 @@ explicitement autorisé par le sujet et suffit. Cf. §8.)*
 │   ├── fake_port.c             #   port sur pool statique, adresses deterministes
 │   ├── test_align.c  test_zone.c  test_alloc.c  test_free_coalesce.c
 │   ├── test_realloc.c  test_show.c  test_errors.c  test_thread.c  test_env.c
-│   ├── test_fuzz.c             # ⭐ oracle + ftm_check_arena() a chaque etape
+│   ├── test_fuzz.c             # ⭐ oracle + ftm_check_heap() a chaque etape
 │   └── integration/            #   scripts LD_PRELOAD (ls, vim, prog multithread) — phase 14
 │
 ├── bench/  bench_alloc.c
@@ -277,7 +277,7 @@ Légende : ⬜ à faire · 🟨 en cours · ✅ fait
 
 ---
 
-### 🟨 Phase 0 — Socle du repo  (build facon woody)
+### ✅ Phase 0 — Socle du repo  (build facon woody)
 **Objectif** : `./configure && make` produit `libft_malloc_$(HOSTTYPE).so` + le symlink,
 et `make -C tests` fait passer un test smoke. Aucun allocateur encore.
 
@@ -312,7 +312,7 @@ LINK := libft_malloc.so
 - Si le shell exporte `HOSTTYPE`, on obtient `x86_64` au lieu de `x86_64_Linux` — les deux
   sont conformes, mais sache lequel tu produis.
 
-### ⬜ Phase 1 — Le contrat et les types
+### ✅ Phase 1 — Le contrat et les types
 **Objectif** : figer les interfaces avant d'écrire la moindre logique.
 
 - `core/ftm_port.h` (les 9 fonctions, cf. §2)
@@ -333,12 +333,12 @@ LINK := libft_malloc.so
       uintptr_t        kind;      /* FTM_TINY | FTM_SMALL | FTM_LARGE */
   } t_zone;
 
-  typedef struct s_arena {
+  typedef struct s_heap {
       t_zone  *zones[3];          /* indexé par kind */
       size_t   mmap_calls;
       size_t   munmap_calls;
       int      initialized;
-  } t_arena;
+  } t_heap;
   ```
 - `port/ftm_stdint.h`
 
@@ -346,15 +346,15 @@ LINK := libft_malloc.so
 port. C'est le test d'étanchéité de la couche : si ça râle sur un symbole libc, c'est
 qu'un `#include <string.h>` s'est glissé quelque part.
 
-**Note sur `t_arena`** : en interne, toutes les fonctions prennent `t_arena *a`. Le
-`static t_arena g_arena` du shim est l'unique instance exposée (conforme au sujet :
+**Note sur `t_heap`** : en interne, toutes les fonctions prennent `t_heap *a`. Le
+`static t_heap g_heap` du shim est l'unique instance exposée (conforme au sujet :
 « a global variable to manage your allocations »). Coût : un paramètre. Bénéfice
 immédiat : **chaque test unitaire travaille sur une arena neuve et isolée**, au lieu de
 subir l'état laissé par le test précédent.
 
 ---
 
-### ⬜ Phase 2 — Port POSIX + fake port
+### ✅ Phase 2 — Port POSIX + fake port
 - `ftm_map_pages` → `mmap(NULL, n, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)`,
   `MAP_FAILED` → `NULL`
 - `ftm_page_size` → `sysconf(_SC_PAGESIZE)`, mis en cache dans un `static`
@@ -369,11 +369,11 @@ subir l'état laissé par le test précédent.
 
 ---
 
-### ⬜ Phase 3 — Alignement et en-têtes
+### ✅ Phase 3 — Alignement et en-têtes
 - `ftm_align_up()`, `ftm_size_class(size)` → `TINY|SMALL|LARGE`
 - Accesseurs : `ftm_block_payload(b)`, `ftm_payload_block(p)`, `ftm_block_end(b)`
 - `ftm_block_is_free()` / `ftm_block_set_free()` via `flags`
-- `_Static_assert(FTM_BLOCK_HDR % FTM_ALIGNMENT == 0, "header misaligned")`
+- `_Static_assert(FTM_BLOCK_HEADER_SIZE % FTM_ALIGNMENT == 0, "header misaligned")`
 
 **Done quand** : test aux valeurs limites — 0, 1, `n`, `n+1`, `m`, `m+1`, `SIZE_MAX`.
 
@@ -381,13 +381,13 @@ subir l'état laissé par le test précédent.
 Toute addition sur une taille venant de l'utilisateur doit être précédée d'un contrôle
 d'overflow :
 ```c
-if (size > SIZE_MAX - FTM_BLOCK_HDR - FTM_ALIGNMENT)
+if (size > SIZE_MAX - FTM_BLOCK_HEADER_SIZE - FTM_ALIGNMENT)
     return (NULL);
 ```
 
 ---
 
-### ⬜ Phase 4 — Zone
+### ✅ Phase 4 — Zone
 - `ftm_zone_create(a, kind)` → `ftm_map_pages` + un unique bloc libre couvrant tout
 - `ftm_zone_destroy(a, z)` → retire de la liste + `ftm_unmap_pages`
 - Itération sur les blocs **en ordre d'adresse**
@@ -398,7 +398,7 @@ if (size > SIZE_MAX - FTM_BLOCK_HDR - FTM_ALIGNMENT)
 
 ---
 
-### ⬜ Phase 5 — `ftm_alloc()` puis `malloc()`
+### 🟨 Phase 5 — `ftm_alloc()` puis `malloc()`
 - Routage par classe, first-fit sur les zones existantes, création de zone si besoin
 - **Split** d'un bloc trop grand — mais pas si le reste ne peut pas contenir
   `BLOCK_HDR + ALIGNMENT` (sinon tu fabriques des blocs inutilisables)
@@ -414,7 +414,7 @@ non chevauchantes, dans exactement 2 zones TINY.
   (comportement glibc), pas `NULL`. À noter dans `decisions.md`.
 - **Initialisation paresseuse, pas de `__attribute__((constructor))`.** En `LD_PRELOAD`,
   l'ordre des constructeurs n'est pas garanti et ton `malloc` peut être appelé avant le
-  tien. Un drapeau `g_arena.initialized` sous lock suffit.
+  tien. Un drapeau `g_heap.initialized` sous lock suffit.
 - **Ne jamais appeler `printf` depuis la lib** : `printf` alloue → récursion infinie.
   D'où `ftm_fmt.c` en phase 8.
 
@@ -433,7 +433,7 @@ non chevauchantes, dans exactement 2 zones TINY.
 à **un seul** bloc libre pleine taille. Le test compte les blocs, pas seulement l'absence
 de crash.
 
-**C'est la phase qui décide de la qualité du projet.** Écris `ftm_check_arena()`
+**C'est la phase qui décide de la qualité du projet.** Écris `ftm_check_heap()`
 (phase 13) juste après : tous les bugs suivants deviennent évidents au lieu d'être
 mystérieux.
 
@@ -494,7 +494,7 @@ Fais **(a) et (b)**. Peu de gens gèrent ça, et c'est exactement ce qui disting
 ---
 
 ### 🔒 Point de contrôle — la partie obligatoire doit être PARFAITE ici
-Avant d'attaquer les bonus : phases 0→9 vertes, plus le `ftm_check_arena()` et le fuzz de
+Avant d'attaquer les bonus : phases 0→9 vertes, plus le `ftm_check_heap()` et le fuzz de
 la phase 13 (au moins la version courte). Les bonus ne sont pas évalués si l'obligatoire
 ne l'est pas.
 
@@ -508,7 +508,7 @@ ne l'est pas.
   de soutenance sur ce bonus. Le mutex global est le bon choix par défaut ; sache dire
   pourquoi, et ce que coûterait l'alternative.
 
-**Done quand** : 8 threads × 50 000 opérations aléatoires ⇒ `ftm_check_arena()` vert et
+**Done quand** : 8 threads × 50 000 opérations aléatoires ⇒ `ftm_check_heap()` vert et
 aucun chevauchement de pointeurs.
 
 **Piège** : `fork()`. Si un thread tient le lock au moment du fork, l'enfant hérite d'un
@@ -529,11 +529,11 @@ mutex verrouillé à vie. `pthread_atfork()` règle ça — bonus du bonus, mais
 Lecture **une seule fois**, à l'init, dans `port/ftm_env.c`. `getenv` n'alloue pas sur
 glibc — vérifie-le quand même, c'est le bon réflexe.
 
-Les hooks posés en phase 5 deviennent simplement actifs : **aucune ligne de `ftm_arena.c`
+Les hooks posés en phase 5 deviennent simplement actifs : **aucune ligne de `ftm_heap.c`
 ne change**. C'est le test que l'anticipation des bonus a fonctionné.
 
 ⚠️ `FT_MALLOC_GUARD` change la taille réelle des blocs → ça passe par `ftm_align.c`, pas
-par un bricolage dans `ftm_arena.c`.
+par un bricolage dans `ftm_heap.c`.
 
 ---
 
@@ -548,14 +548,14 @@ par un bricolage dans `ftm_arena.c`.
 ---
 
 ### ⬜ Phase 13 — Invariants, fuzz, bench, tuning
-- **`ftm_check_arena()`** — la fonction la plus rentable du projet :
+- **`ftm_check_heap()`** — la fonction la plus rentable du projet :
   - les blocs d'une zone couvrent exactement la zone, sans trou ni chevauchement
   - `b->next->prev == b` pour tout bloc
   - **aucun couple de blocs libres adjacents** (⇒ le coalescing est correct)
   - tout payload aligné sur `FTM_ALIGNMENT`
   - compilée conditionnellement (`-DFTM_DEBUG`) pour ne pas plomber la release
 - **Fuzz avec oracle** : un tableau `{ptr, size, seed}` en parallèle ; à chaque opération
-  aléatoire on relit le contenu et on appelle `ftm_check_arena()`
+  aléatoire on relit le contenu et on appelle `ftm_check_heap()`
 - **Bench** (`rdtsc`) : nb de syscalls, cycles/op, fragmentation, sur trois profils
   (beaucoup de petits / mix / beaucoup de gros). **C'est ici qu'on re-tune `n` et `m`** avec
   des chiffres, et qu'on tranche first-fit vs best-fit.
@@ -582,7 +582,7 @@ par un bricolage dans `ftm_arena.c`.
 ## 7. Ordre de travail
 
 ```
-0 → 1 → 2 → 3 → 4 → 5 → 6 → [ftm_check_arena() ici] → 7 → 8 → 9 → 13(court)
+0 → 1 → 2 → 3 → 4 → 5 → 6 → [ftm_check_heap() ici] → 7 → 8 → 9 → 13(court)
                                                          ↑ obligatoire PARFAIT
                                                     → 10 → 11 → 12      ← bonus
                                                     → 13(bench+tuning)

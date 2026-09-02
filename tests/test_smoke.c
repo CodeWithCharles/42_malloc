@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/01 17:31:27 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/01 17:31:50 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 15:37:00 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,6 @@
 
 int main(void)
 {
-    printf("smoke: tests build chain OK\n");
-    return (0);
+	printf("smoke: tests build chain OK\n");
+	return (0);
 }

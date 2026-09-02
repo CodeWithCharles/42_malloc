@@ -439,7 +439,7 @@ mystérieux.
 
 ---
 
-### 🟨 Phase 7 — `ftm_resize()` / `realloc()`
+### ✅ Phase 7 — `ftm_resize()` / `realloc()`
 Dans l'ordre :
 1. `realloc(NULL, n)` ≡ `malloc(n)`
 2. `realloc(p, 0)` → décision à consigner (glibc : free + pointeur minimal)
@@ -457,7 +457,7 @@ descendant, et vérifie que les octets survivants sont intacts.
 
 ---
 
-### ⬜ Phase 8 — `show_alloc_mem()`
+### 🟨 Phase 8 — `show_alloc_mem()`
 - Zones triées par adresse croissante, blocs **alloués** uniquement
 - Format strict du sujet ; `Total` = somme des payloads alloués, **pas** la taille des zones
 - `ftm_fmt.c` : ton propre `hex()` et `udec()` écrivant dans un buffer sur la pile, puis

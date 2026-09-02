@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 14:36:57 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:57:02 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 17:29:20 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -42,5 +42,6 @@ bool			ftm_check_heap(void);
 
 void			ftm_release(void *ptr);
 void			*ftm_alloc(size_t size);
+void			*ftm_resize(void *ptr, size_t size);
 
 #endif

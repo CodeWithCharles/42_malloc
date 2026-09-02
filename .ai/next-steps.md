@@ -1,15 +1,13 @@
 # Prochains petits pas
 
-## 🟨 Phase 5 — ftm_alloc + malloc (en cours)
-Le coeur. `src/core/ftm_heap.c` : g_heap (variable globale unique), init paresseuse,
-routage par classe, first-fit sur zones existantes, SPLIT d'un bloc trop grand, creation
-de zone a la demande, chainage des zones dans g_heap.zones[kind]. Hooks ftm_on_alloc (vides).
-lock/unlock (no-op) autour. Puis le shim src/malloc.c → ftm_alloc.
+## 🟨 Phase 8 — show_alloc_mem (en cours)
+`src/core/ftm_fmt.c` : formatage maison (hex, decimal) — PAS de printf (printf alloue).
+`src/core/ftm_show.c` : parcours zones triees par adresse croissante, blocs ALLOUES only,
+format exact du sujet, Total = somme des payloads alloues. Une seule ftm_write par ligne.
+Test compare la sortie au caractere pres (fake_port → adresses deterministes).
 
-DECISION A PRENDRE : politique malloc(0). Reco = pointeur unique liberable (glibc), pas NULL.
+Invariant acquis en phase 7 : classe d'une allocation vivante == classe de sa zone
+(garantit l'affichage sous le bon en-tete TINY/SMALL/LARGE).
 
-**Criteres** : 200 malloc(64) → 200 adresses distinctes, alignees 16, non chevauchantes,
-dans exactement 2 zones TINY. Pas de __attribute__((constructor)). Jamais de printf.
-
-## Phase 6 — free + coalescing (B4)
-## Phase 7 — realloc
+## Phase 9 — robustesse + famille de symboles (aligned_alloc, posix_memalign, ...)
+## Point de controle : obligatoire PARFAIT avant les bonus

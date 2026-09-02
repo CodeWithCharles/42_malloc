@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/01 17:30:28 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 16:12:40 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 17:32:24 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -33,16 +33,28 @@ void free(void *ptr)
 
 void *realloc(void *ptr, size_t size)
 {
-	(void)ptr;
-	(void)size;
-	return (NULL);
+	void	*result;
+
+	ftm_lock();
+	result = ftm_resize(ptr, size);
+	ftm_unlock();
+	return (result);
 }
 
-void *calloc(size_t nmemb, size_t size)
+void	*calloc(size_t nmemb, size_t size)
 {
-	(void)nmemb;
-	(void)size;
-	return (NULL);
+	size_t	total;
+	void	*ptr;
+
+	if (size != 0 && nmemb > SIZE_MAX / size)
+		return (NULL);
+	total = nmemb * size;
+	ftm_lock();
+	ptr = ftm_alloc(total);
+	ftm_unlock();
+	if (ptr != NULL)
+		ftm_memset(ptr, 0, total);
+	return (ptr);
 }
 
 void show_alloc_mem(void) {}

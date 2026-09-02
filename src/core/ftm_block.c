@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:31:28 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:37:09 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 17:04:35 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,4 +31,17 @@ t_block *ftm_block_split(t_block *block, size_t payload_size)
 	block->next = remainder;
 	block->payload_size = payload_size;
 	return (block);
+}
+
+void	ftm_block_coalesce_next(t_block *block)
+{
+	t_block	*next;
+
+	next = block->next;
+	if (next == NULL || !ftm_block_is_free(block) || !ftm_block_is_free(next))
+		return ;
+	block->payload_size += FTM_BLOCK_HEADER_SIZE + next->payload_size;
+	block->next = next->next;
+	if (next->next != NULL)
+		next->next->prev = block;
 }

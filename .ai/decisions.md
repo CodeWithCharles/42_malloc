@@ -242,3 +242,11 @@ satisfait (une seule variable globale). Signatures plus simples.
 **Décision.** Le vérificateur d'invariants `ftm_check_heap()` (écrit dès la phase 6, pas
 la 13) est défini seulement sous `-DFTM_DEBUG`. Les tests compilent avec ce flag ; la
 `.so` de release ne l'embarque pas. Prototype déclaré en permanence dans `ftm_internal.h`.
+
+---
+
+## D19 — realloc(ptr, 0) = free(ptr) puis pointeur minimal (2026-09-02)
+**Décision.** `realloc(ptr, 0)` libère `ptr` et renvoie un pointeur minimal valide et
+libérable (équivalent `malloc(0)`), pas `NULL`. Cohérent avec [[D16]].
+
+**Pourquoi.** Symétrie avec la politique `malloc(0)` et comportement de la lib de référence.

@@ -420,7 +420,7 @@ non chevauchantes, dans exactement 2 zones TINY.
 
 ---
 
-### 🟨 Phase 6 — `ftm_release()` + coalescing (bonus B4)
+### ✅ Phase 6 — `ftm_release()` + coalescing (bonus B4)
 - Retrouver la zone d'un pointeur : parcours des trois listes
 - Marquer libre, puis fusionner avec `prev` **et** `next` s'ils sont libres — d'où l'ordre
   par adresse décidé en phase 4
@@ -439,7 +439,7 @@ mystérieux.
 
 ---
 
-### ⬜ Phase 7 — `ftm_resize()` / `realloc()`
+### 🟨 Phase 7 — `ftm_resize()` / `realloc()`
 Dans l'ordre :
 1. `realloc(NULL, n)` ≡ `malloc(n)`
 2. `realloc(p, 0)` → décision à consigner (glibc : free + pointeur minimal)

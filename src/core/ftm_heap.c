@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:38:11 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:45:14 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 16:04:42 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -107,4 +107,87 @@ void	ftm_heap_reset(void)
 	g_heap.map_calls = 0;
 	g_heap.unmap_calls = 0;
 	g_heap.is_initialized = false;
+}
+
+t_zone	*ftm_heap_find_zone(void *ptr)
+{
+	t_zone			*zone;
+	unsigned char	*address;
+	int				kind;
+
+	address = ptr;
+	kind = 0;
+	while (kind < FTM_ZONE_KIND_COUNT)
+	{
+		zone = g_heap.zones[kind];
+		while (zone != NULL)
+		{
+			if (address > (unsigned char *)zone
+				&& address < (unsigned char *)zone + zone->total_size)
+				return (zone);
+			zone = zone->next;
+		}
+		kind++;
+	}
+	return (NULL);
+}
+
+static bool	zone_is_fully_free(t_zone *zone)
+{
+	t_block	*first;
+
+	first = ftm_zone_first_block(zone);
+	return (ftm_block_is_free(first) && first->next == NULL);
+}
+
+static size_t	count_zones(t_zone_kind kind)
+{
+	t_zone	*zone;
+	size_t	total;
+
+	total = 0;
+	zone = g_heap.zones[kind];
+	while (zone != NULL)
+	{
+		total++;
+		zone = zone->next;
+	}
+	return (total);
+}
+
+static void	heap_release_zone_if_free(t_zone *zone)
+{
+	if (!zone_is_fully_free(zone))
+		return ;
+	if (zone->kind != FTM_LARGE && count_zones(zone->kind) <= 1)
+		return ;
+	if (zone->prev != NULL)
+		zone->prev->next = zone->next;
+	else
+		g_heap.zones[zone->kind] = zone->next;
+	if (zone->next != NULL)
+		zone->next->prev = zone->prev;
+	ftm_zone_destroy(zone);
+	g_heap.unmap_calls++;
+}
+
+void	ftm_release(void *ptr)
+{
+	t_zone	*zone;
+	t_block	*block;
+
+	if (ptr == NULL)
+		return ;
+	zone = ftm_heap_find_zone(ptr);
+	if (zone == NULL)
+		return ;
+	block = ftm_payload_to_block(ptr);
+	ftm_block_mark_free(block);
+	ftm_block_coalesce_next(block);
+	if (block->prev != NULL && ftm_block_is_free(block->prev))
+	{
+		block = block->prev;
+		ftm_block_coalesce_next(block);
+	}
+	heap_release_zone_if_free(zone);
 }

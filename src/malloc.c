@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/01 17:30:28 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:46:07 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 16:12:40 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,7 +24,12 @@ void *malloc(size_t size)
 	return (ptr);
 }
 
-void free(void *ptr) { (void)ptr; }
+void free(void *ptr)
+{
+	ftm_lock();
+	ftm_release(ptr);
+	ftm_unlock();
+}
 
 void *realloc(void *ptr, size_t size)
 {

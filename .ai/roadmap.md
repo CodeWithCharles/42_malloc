@@ -398,7 +398,7 @@ if (size > SIZE_MAX - FTM_BLOCK_HEADER_SIZE - FTM_ALIGNMENT)
 
 ---
 
-### 🟨 Phase 5 — `ftm_alloc()` puis `malloc()`
+### ✅ Phase 5 — `ftm_alloc()` puis `malloc()`
 - Routage par classe, first-fit sur les zones existantes, création de zone si besoin
 - **Split** d'un bloc trop grand — mais pas si le reste ne peut pas contenir
   `BLOCK_HDR + ALIGNMENT` (sinon tu fabriques des blocs inutilisables)
@@ -420,7 +420,7 @@ non chevauchantes, dans exactement 2 zones TINY.
 
 ---
 
-### ⬜ Phase 6 — `ftm_release()` + coalescing (bonus B4)
+### 🟨 Phase 6 — `ftm_release()` + coalescing (bonus B4)
 - Retrouver la zone d'un pointeur : parcours des trois listes
 - Marquer libre, puis fusionner avec `prev` **et** `next` s'ils sont libres — d'où l'ordre
   par adresse décidé en phase 4

@@ -211,3 +211,34 @@ extraits privilégient donc des noms parlants (`ftm_block_split`, `zone_is_fully
 contextes par thread — on n'en a qu'un) et l'idiome « un gros bloc qu'on double ». `t_heap`
 dit ce que c'est sans ambiguïté. `HDR` violait D14 (les noms doivent crier). Remplace la
 terminologie de [[D11]] (`t_heap` → `t_heap`) et [[D8]] (garde `ftm_*` pour les tests).
+
+---
+
+## D16 — malloc(0) renvoie un pointeur unique libérable (2026-09-02)
+**Décision.** `malloc(0)` ne renvoie pas `NULL` mais un pointeur valide, unique et
+libérable — on aligne la demande à la plus petite taille possible (`size=0 → 1 → 16`).
+
+**Pourquoi.** Comportement de la libc de référence (glibc). Beaucoup de programmes réels
+font `free(malloc(0))` en supposant un pointeur non-NULL ; renvoyer `NULL` casse `vim` &
+consorts. Confirmé par Charles (« on se base sur la lib de référence »).
+
+**Idem à prévoir :** `realloc(p, 0)` (phase 7) suivra la même logique de référence
+(free + pointeur minimal).
+
+---
+
+## D17 — ftm_heap_reset & param heap : ajustement de D11 (2026-09-02)
+**Décision.** Plutôt que de faire circuler un `t_heap *` dans toutes les signatures
+(idée initiale de [[D11]]), on garde un `static t_heap g_heap` unique et on expose
+`ftm_heap_reset()` + `ftm_heap_instance()` pour les tests.
+
+**Pourquoi.** L'isolation des tests (chaque test repart d'un heap vierge) était le seul
+vrai besoin de D11 une fois KFS-3 hors périmètre. Un reset suffit, et ça garde le sujet
+satisfait (une seule variable globale). Signatures plus simples.
+
+---
+
+## D18 — ftm_check_heap compilé sous -DFTM_DEBUG (2026-09-02)
+**Décision.** Le vérificateur d'invariants `ftm_check_heap()` (écrit dès la phase 6, pas
+la 13) est défini seulement sous `-DFTM_DEBUG`. Les tests compilent avec ce flag ; la
+`.so` de release ne l'embarque pas. Prototype déclaré en permanence dans `ftm_internal.h`.

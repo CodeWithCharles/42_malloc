@@ -6,16 +6,22 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/01 17:30:28 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:37:06 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 15:46:07 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_malloc.h"
+#include "ftm_internal.h"
+#include "ftm_port.h"
 
 void *malloc(size_t size)
 {
-	(void)size;
-	return (NULL);
+	void	*ptr;
+
+	ftm_lock();
+	ptr = ftm_alloc(size);
+	ftm_unlock();
+	return (ptr);
 }
 
 void free(void *ptr) { (void)ptr; }
@@ -27,9 +33,9 @@ void *realloc(void *ptr, size_t size)
 	return (NULL);
 }
 
-void *calloc(size_t n, size_t size)
+void *calloc(size_t nmemb, size_t size)
 {
-	(void)n;
+	(void)nmemb;
 	(void)size;
 	return (NULL);
 }

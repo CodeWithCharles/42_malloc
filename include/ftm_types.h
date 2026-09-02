@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 12:37:40 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:37:11 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 18:12:46 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,6 +30,7 @@ typedef enum e_zone_kind
 typedef struct s_block
 {
 	size_t          payload_size;
+	size_t			request_size;
 	struct s_block  *next;
 	struct s_block  *prev;
 	uintptr_t       flags;

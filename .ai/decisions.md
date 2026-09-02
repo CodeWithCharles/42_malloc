@@ -250,3 +250,35 @@ la 13) est défini seulement sous `-DFTM_DEBUG`. Les tests compilent avec ce fla
 libérable (équivalent `malloc(0)`), pas `NULL`. Cohérent avec [[D16]].
 
 **Pourquoi.** Symétrie avec la politique `malloc(0)` et comportement de la lib de référence.
+
+---
+
+## D20 — show_alloc_mem affiche la taille DEMANDÉE (option 2) (2026-09-02)
+**Décision.** On ajoute `size_t request_size` à `t_block` et `show_alloc_mem` affiche cette
+taille (celle passée à malloc), pas la taille alignée. La plage affichée est
+`payload → payload + request_size`. En-tête de bloc : 32 → **48 octets** (align 16).
+
+**Pourquoi.** Charles veut l'affichage factuel. Note : `show_alloc_mem` n'est PAS POSIX
+(fonction inventée par le sujet) ; son cousin standard `malloc_usable_size` renvoie la
+taille utilisable — on aurait pu s'en réclamer (option 1), mais l'option 2 est plus
+parlante. L'exemple du sujet n'aligne d'ailleurs pas ses payloads (il se contredit), donc
+ses adresses ne sont pas une spec. `request_size` est purement cosmétique : `ftm_check_heap`
+et toute la géométrie continuent d'utiliser `payload_size` (aligné). N et M restent dérivés,
+donc la contrainte « ≥ 100 allocs » s'adapte automatiquement au nouvel en-tête.
+
+---
+
+## D21 — Objectif POSIX maximal (2026-09-02)
+**Décision.** La phase 9 vise la conformité POSIX la plus large possible :
+- `errno = ENOMEM` sur tout échec d'alloc (malloc/calloc/realloc), `EINVAL` pour
+  `posix_memalign` mal appelé — posé **dans le shim** (`src/malloc.c`), jamais dans `core/`
+  (errno est un concept userspace, cf. D2) ;
+- famille alignée : `posix_memalign`, `aligned_alloc` (+ extensions `memalign`, `valloc`,
+  `pvalloc`, `malloc_usable_size`, `reallocarray`) ;
+- validation de pointeur dans free/realloc (double-free, pointeur étranger, milieu de bloc) ;
+- `realloc(p,0)` : POSIX le laisse implementation-defined (UB en C23) → on garde D19
+  (free + pointeur minimal), c'est un des choix autorisés.
+
+**Limite connue (à défendre) :** un alignement demandé > 16 (ex. `aligned_alloc(4096,…)`)
+oblige à sur-allouer et décaler le payload dans le bloc, avec l'offset stocké juste avant
+le pointeur rendu pour retrouver l'en-tête. Seul point réellement délicat.

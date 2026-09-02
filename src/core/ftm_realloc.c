@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 17:11:53 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 17:38:52 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 17:51:04 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -77,9 +77,16 @@ void	*ftm_resize(void *ptr, size_t size)
 	if (ftm_size_class(new_payload) == zone->kind)
 	{
 		if (new_payload <= block->payload_size)
-			return (shrink_in_place(block, new_payload), ptr);
-		if (try_absorb_next(block, new_payload))
+		{
+			shrink_in_place(block, new_payload);
+			block->request_size = size;
 			return (ptr);
+		}
+		if (try_absorb_next(block, new_payload))
+		{
+			block->request_size = size;
+			return (ptr);
+		}
 	}
 	return (resize_by_moving(ptr, block, size));
 }

@@ -6,13 +6,13 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 16:06:28 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 16:12:01 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 18:15:05 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ftm_internal.h"
 
-#ifdef true
+#ifdef FTM_DEBUG
 
 static bool	check_zone(t_zone *zone)
 {

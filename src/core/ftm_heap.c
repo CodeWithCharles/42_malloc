@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:38:11 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 16:04:42 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 18:12:29 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -69,9 +69,11 @@ void	*ftm_alloc(size_t size)
 {
 	t_zone_kind	kind;
 	size_t		payload_size;
+	size_t		requested;
 	t_block		*block;
 
 	heap_init_if_needed();
+	requested = size;
 	if (size == 0)
 		size = 1;
 	payload_size = ftm_round_up_to_alignment(size);
@@ -81,6 +83,7 @@ void	*ftm_alloc(size_t size)
 	block = heap_reserve_block(kind, payload_size);
 	if (block == NULL)
 		return (NULL);
+	block->request_size = requested;
 	ftm_block_mark_used(block);
 	return (ftm_block_payload(block));
 }

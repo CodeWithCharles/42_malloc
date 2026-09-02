@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 14:36:57 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 17:29:20 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 17:52:16 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,6 +39,11 @@ t_heap			*ftm_heap_instance(void);
 void			ftm_heap_reset(void);
 t_zone			*ftm_heap_find_zone(void *ptr);
 bool			ftm_check_heap(void);
+
+size_t			ftm_fmt_hex(char *dst, uintptr_t value);
+size_t			ftm_fmt_udec(char *dst, size_t value);
+
+void			ftm_show(void);
 
 void			ftm_release(void *ptr);
 void			*ftm_alloc(size_t size);

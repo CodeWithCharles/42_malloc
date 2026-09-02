@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/01 17:32:02 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:37:05 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/02 18:11:37 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,12 +18,28 @@
 
 #define FAKE_POOL_PAGE  4096
 #define FAKE_POOL_SIZE  (16 * 1024 * 1024)
+#define FAKE_CAPTURE_SIZE (64 * 1024)
 
 static _Alignas(FAKE_POOL_PAGE) unsigned char	g_pool[FAKE_POOL_SIZE];
 static size_t	g_offset = 0;
 static int		g_fail_after = -1;
 static size_t	g_map_count = 0;
 static size_t	g_unmap_count = 0;
+static char		g_capture[FAKE_CAPTURE_SIZE];
+static size_t	g_capture_len = 0;
+static int		g_capturing = 0;
+
+void	fake_capture_reset(void)
+{
+	g_capture_len = 0;
+	g_capturing = 1;
+}
+
+const char	*fake_capture_buffer(void)
+{
+	g_capture[g_capture_len] = '\0';
+	return (g_capture);
+}
 
 void	fake_port_reset(void)
 {
@@ -31,6 +47,8 @@ void	fake_port_reset(void)
 	g_fail_after = -1;
 	g_map_count = 0;
 	g_unmap_count = 0;
+	fake_capture_reset();
+	g_capturing = 0;
 }
 
 void	fake_port_fail_after(int successful_maps)
@@ -88,6 +106,15 @@ void	ftm_unlock(void)
 
 void	ftm_write(const char *buffer, size_t length)
 {
+	size_t	i;
+
+	if (g_capturing)
+	{
+		i = 0;
+		while (i < length && g_capture_len + 1 < FAKE_CAPTURE_SIZE)
+			g_capture[g_capture_len++] = buffer[i++];
+		return ;
+	}
 	write(STDOUT_FILENO, buffer, length);
 }
 

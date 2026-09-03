@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 17:11:53 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 11:23:33 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 12:12:06 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -54,6 +54,24 @@ static void	*resize_by_moving(void *ptr, t_block *block, size_t size)
 	return (fresh);
 }
 
+static void	*resize_aligned(void *ptr, size_t size)
+{
+	void	*fresh;
+	size_t	old;
+	size_t	to_copy;
+
+	old = ftm_usable_size(ptr);
+	fresh = ftm_alloc(size);
+	if (fresh == NULL)
+		return (NULL);
+	to_copy = old;
+	if (size < to_copy)
+		to_copy = size;
+	ftm_memcpy(fresh, ptr, to_copy);
+	ftm_release(ptr);
+	return (fresh);
+}
+
 void	*ftm_resize(void *ptr, size_t size)
 {
 	t_zone	*zone;
@@ -68,8 +86,14 @@ void	*ftm_resize(void *ptr, size_t size)
 		return (ftm_alloc(0));
 	}
 	zone = ftm_heap_find_zone(ptr);
-	if (zone == NULL || !ftm_pointer_is_allocated(ptr, zone))
+	if (zone == NULL)
 		return (NULL);
+	if (!ftm_pointer_is_allocated(ptr, zone))
+	{
+		if (ftm_aligned_base(ptr, zone) == NULL)
+			return (NULL);
+		return (resize_aligned(ptr, size));
+	}
 	new_payload = ftm_round_up_to_alignment(size);
 	if (new_payload == 0)
 		return (NULL);

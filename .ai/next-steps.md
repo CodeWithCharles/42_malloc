@@ -1,14 +1,21 @@
 # Prochains petits pas
 
-## 🟨 Phase 9 — Robustesse + POSIX max (en cours, DERNIERE de l'obligatoire)
-1. Validation de pointeur (ftm_guard.c) : free/realloc d'un pointeur etranger, double-free,
-   pointeur au milieu d'un bloc → detectes, jamais de crash. Marqueur "magic" dans le header.
-2. errno = ENOMEM sur echec alloc (dans le shim src/malloc.c, PAS dans core).
-3. Famille alignee : posix_memalign, aligned_alloc, memalign, valloc, pvalloc,
-   malloc_usable_size, reallocarray. Over-allocation + offset stocke avant le pointeur.
-4. free() valide que le pointeur est a nous (sinon no-op) → survit a posix_memalign externe.
+## ✅ PARTIE OBLIGATOIRE COMPLETE (phases 0-9)
+malloc/free/realloc/calloc + famille alignee POSIX + show_alloc_mem, interposable
+LD_PRELOAD (bash, vim, ls OK). 12 tests unitaires verts. errno, validation pointeur,
+coalescing, zones recyclees, pas de leak (compteurs equilibres).
 
-Cibles POSIX : cf. decisions D19/D21. Point delicat = alignement > 16 (over-alloc + offset).
+## 🔒 Point de controle "OBLIGATOIRE PARFAIT" (a faire avant les bonus)
+Le sujet : les bonus ne sont evalues QUE si l'obligatoire est parfait.
+1. Relecture code (clean, noms qui crient, zero commentaire superflu, D14).
+2. LD_PRELOAD sur ls / bash / vim / git / python3 sans crash.
+3. Fuzz court + ftm_check_heap ( debut de phase 13, en avance).
+4. Verifier Makefile : make / re / fclean / recompilation incrementale / symlink / HOSTTYPE.
+5. Verifier norme "clean code" meme sans norminette.
 
-## Point de controle : OBLIGATOIRE PARFAIT
-Apres phase 9 : relire tout, LD_PRELOAD sur ls/vim, fuzz court. Puis bonus (10-12) et 13.
+## Ensuite — BONUS (dans l'ordre)
+- Phase 10 : thread-safe (ftm_lock/unlock reels, pthread_mutex). B1.
+- Phase 11 : variables d'env de debug (FT_MALLOC_*). B2.
+- Phase 12 : show_alloc_mem_ex (historique + hexdump). B3.
+- Phase 13 : invariants + fuzz massif + bench + tuning n/m.
+- Phase 14 : integration reelle finale.

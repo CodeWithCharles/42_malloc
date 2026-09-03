@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:38:11 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 11:22:24 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 12:09:51 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -174,17 +174,8 @@ static void	heap_release_zone_if_free(t_zone *zone)
 	g_heap.unmap_calls++;
 }
 
-void	ftm_release(void *ptr)
+static void	release_block(t_zone *zone, t_block *block)
 {
-	t_zone	*zone;
-	t_block	*block;
-
-	if (ptr == NULL)
-		return ;
-	zone = ftm_heap_find_zone(ptr);
-	if (zone == NULL || !ftm_pointer_is_allocated(ptr, zone))
-		return ;
-	block = ftm_payload_to_block(ptr);
 	ftm_block_mark_free(block);
 	ftm_block_coalesce_next(block);
 	if (block->prev != NULL && ftm_block_is_free(block->prev))
@@ -193,4 +184,27 @@ void	ftm_release(void *ptr)
 		ftm_block_coalesce_next(block);
 	}
 	heap_release_zone_if_free(zone);
+}
+
+void	ftm_release(void *ptr)
+{
+	t_zone	*zone;
+	void	*base;
+
+	if (ptr == NULL)
+		return ;
+	zone = ftm_heap_find_zone(ptr);
+	if (zone == NULL)
+		return ;
+	if (ftm_pointer_is_allocated(ptr, zone))
+	{
+		release_block(zone, ftm_payload_to_block(ptr));
+		return ;
+	}
+	base = ftm_aligned_base(ptr, zone);
+	if (base == NULL)
+		return ;
+	zone = ftm_heap_find_zone(base);
+	if (zone != NULL && ftm_pointer_is_allocated(base, zone))
+		release_block(zone, ftm_payload_to_block(base));
 }

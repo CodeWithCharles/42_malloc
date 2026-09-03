@@ -282,3 +282,24 @@ donc la contrainte « ≥ 100 allocs » s'adapte automatiquement au nouvel en-t�
 **Limite connue (à défendre) :** un alignement demandé > 16 (ex. `aligned_alloc(4096,…)`)
 oblige à sur-allouer et décaler le payload dans le bloc, avec l'offset stocké juste avant
 le pointeur rendu pour retrouver l'en-tête. Seul point réellement délicat.
+
+---
+
+## D22 — Stratégie leaks : compteurs map/unmap, pas valgrind (2026-09-02)
+**Décision.** On vérifie l'absence de fuite de zones via les compteurs `map_count`/
+`unmap_count` du fake port : après workload + free total + `ftm_heap_reset()`, on doit
+avoir `map_count == unmap_count`. Test dédié `tests/test_leak.c`.
+
+**Pourquoi.** `valgrind` sous `LD_PRELOAD` ne teste PAS notre allocateur : valgrind
+remplace lui-même malloc/free plus bas que LD_PRELOAD, notre `.so` n'est pas exercé. Nos
+compteurs sont la mesure fiable, à la granularité de la zone.
+
+---
+
+## D23 — Famille alignée : sur-allocation + tag avant le pointeur (2026-09-02)
+**Décision.** `posix_memalign`/`aligned_alloc`/`memalign`/`valloc`/`pvalloc` :
+- alignement ≤ 16 → `ftm_alloc` normal (déjà 16-aligné) ;
+- alignement > 16 → sur-allouer `size + alignment + sizeof(t_align_tag)`, placer un pointeur
+  aligné dedans, et écrire un `t_align_tag {magic, base}` juste AVANT ce pointeur.
+`free`/`realloc`/`malloc_usable_size` détectent le tag (`FTM_ALIGN_MAGIC`) quand la
+validation normale échoue, et retrouvent le bloc `base`. errno=EINVAL/ENOMEM selon POSIX.

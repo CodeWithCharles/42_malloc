@@ -468,7 +468,7 @@ caractère par caractère à une chaîne attendue.
 
 ---
 
-### 🟨 Phase 9 — Robustesse + POSIX (errno, famille alignée, validation)
+### ✅ Phase 9 — Robustesse + POSIX (validation, errno, famille alignée)
 *« In no way can your function lead to undefined behaviour or segv. »*
 
 Cas à couvrir dans `ftm_guard.c` :

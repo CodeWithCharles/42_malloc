@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 12:37:40 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 11:17:17 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 11:58:52 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,6 +23,8 @@ typedef enum e_zone_kind
 	FTM_LARGE = 2,
 	FTM_ZONE_KIND_COUNT = 3
 } t_zone_kind;
+
+/* ---------------------------------- Flags --------------------------------- */
 
 # define FTM_BLOCK_FREE		((uintptr_t)0x01)
 # define FTM_BLOCK_CANARY	((uintptr_t)0x02)
@@ -54,8 +56,18 @@ typedef struct s_heap
 	bool    is_initialized;
 } t_heap;
 
+# define FTM_ALIGN_MAGIC		((uintptr_t)0x414C4D42)
+
+typedef struct	s_align_tag
+{
+	uintptr_t	magic;
+	void		*base;
+} t_align_tag;
+
 # define FTM_BLOCK_HEADER_SIZE  FTM_ALIGN_UP(sizeof(t_block), FTM_ALIGNMENT)
 # define FTM_ZONE_HEADER_SIZE   FTM_ALIGN_UP(sizeof(t_zone), FTM_ALIGNMENT)
+
+/* ------------------------------ Static checks ----------------------------- */
 
 _Static_assert(FTM_ALIGNMENT >= sizeof(void *),
 	"alignment too small");

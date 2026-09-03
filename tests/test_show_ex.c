@@ -40,7 +40,7 @@ int	main(void)
 	CHECK(strstr(fake_capture_buffer(), "--- stats ---") != NULL);
 	CHECK(strstr(fake_capture_buffer(), "zones        : ") != NULL);
 	CHECK(strstr(fake_capture_buffer(), "--- history ---") != NULL);
-	CHECK(strstr(fake_capture_buffer(), "48 65 6C 6C 6F") != NULL);
+	CHECK(strstr(fake_capture_buffer(), "68 65 6C 6C 6F") != NULL);
 	CHECK(strstr(fake_capture_buffer(), "hello") != NULL);
 
 	ftm_release(p);

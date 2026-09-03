@@ -1,5 +1,10 @@
 # ROADMAP FINIE
 
+> **Session en cours sur cette branche** : re-coder l'optimisation LARGE en mode
+> `collab-pairing-mentor`. Tout le briefing est dans `.ai/mentor-large-perf.md` —
+> c'est LE document à suivre, les étapes ci-dessous (relecture, soutenance) restent
+> valables pour le rendu final sur master.
+
 ## Etat
 - 15 phases sur 15 ✅
 - 14 tests unitaires verts (dont fuzz 200k ops)

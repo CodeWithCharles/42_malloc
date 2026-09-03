@@ -89,13 +89,21 @@ void    *ftm_memset(void *dst, int value, size_t length)
 	return (ft_memset(dst, value, length));
 }
 
+static void	fatal_write(const char *buf, size_t length)
+{
+	ssize_t	unused;
+
+	unused = write(STDERR_FILENO, buf, length);
+	(void)unused;
+}
+
 void    ftm_fatal(const char *message)
 {
 	if (message != NULL)
 	{
 		while (*message)
-			write(STDERR_FILENO, message++, 1);
-		write(STDERR_FILENO, "\n", 1);
+			fatal_write(message++, 1);
+		fatal_write("\n", 1);
 	}
 	abort();
 }

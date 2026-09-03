@@ -1,7 +1,10 @@
 # État du projet
 
-**Dernière mise à jour** : 2026-09-01
-**Branche** : `master` (aucun commit)
+**Dernière mise à jour** : 2026-09-03
+**Branche** : `mentor/large-perf-redo` — branche de session mentor : re-coder
+l'optimisation du profil LARGE (cache de zones + page map + alloc O(1)).
+**À lire en premier** : `.ai/mentor-large-perf.md` — le briefing complet de la session
+(diagnostic, design validé par prototype, plan en petits pas, pièges, chiffres).
 **Périmètre de la session** : projet **`malloc`** uniquement. KFS-3 a servi de référence
 pour quelques choix d'architecture, mais n'est pas au programme ici (cf. roadmap §8).
 

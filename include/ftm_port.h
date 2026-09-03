@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 14:12:19 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 11:58:28 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 15:05:04 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,8 @@
 # define FTM_PORT_H
 
 # include "ftm_stdint.h"
+
+void	ftm_debug_load(void);
 
 size_t  ftm_page_size(void);
 void    *ftm_map_pages(size_t length);

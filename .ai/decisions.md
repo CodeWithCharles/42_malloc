@@ -303,3 +303,17 @@ compteurs sont la mesure fiable, à la granularité de la zone.
   aligné dedans, et écrire un `t_align_tag {magic, base}` juste AVANT ce pointeur.
 `free`/`realloc`/`malloc_usable_size` détectent le tag (`FTM_ALIGN_MAGIC`) quand la
 validation normale échoue, et retrouvent le bloc `base`. errno=EINVAL/ENOMEM selon POSIX.
+
+## D24 — Verrou pthread dans le port, atfork, tests via wrap manuel (2026-09-02)
+ftm_lock/unlock reels dans src/port/ftm_lock_pthread.c (mutex statique + pthread_atfork via
+pthread_once). Verrou pris par le shim, pas par core. Archive de test compile aussi ce
+fichier (stubs vides retires de fake_port.c). Build -pthread.
+
+## D25 — Debug via env : contrat 10e fonction ftm_debug_load (2026-09-02)
+Config debug = t_debug static dans core/ftm_debug.c (getter ftm_debug()). Chargee par la
+10e fonction du contrat ftm_debug_load() : POSIX lit getenv (src/port/ftm_env.c), fake port
+= no-op (tests pilotent ftm_debug() a la main). Appelee 1x depuis heap_init_if_needed.
+Vars : FT_MALLOC_SCRIBBLE (0xDE au free), FT_MALLOC_PERTURB=n (au alloc), FT_MALLOC_GUARD
+(canari dans [request_size, payload_size), guard force +ALIGNMENT a l'alloc), FT_MALLOC_ABORT
+(ftm_fatal sur erreur). Hooks ftm_on_alloc/on_free deja poses en phase 5 -> zero ligne de
+logique d'alloc modifiee (anticipation D6 validee). ftm_heap.c inclut desormais ftm_port.h.

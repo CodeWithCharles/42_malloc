@@ -516,7 +516,7 @@ mutex verrouillé à vie. `pthread_atfork()` règle ça — bonus du bonus, mais
 
 ---
 
-### ⬜ Phase 11 — Bonus B2 : variables d'environnement
+### ✅ Phase 11 — Bonus B2 : variables d'environnement
 | Variable | Effet |
 |---|---|
 | `FT_MALLOC_SCRIBBLE=1` | remplit le payload libéré de `0xDE` → détecte l'use-after-free |
@@ -537,7 +537,7 @@ par un bricolage dans `ftm_heap.c`.
 
 ---
 
-### ⬜ Phase 12 — Bonus B3 : `show_alloc_mem_ex()`
+### 🟨 Phase 12 — Bonus B3 : `show_alloc_mem_ex()`
 - Journal circulaire des N dernières opérations (`ftm_history.c`, alimenté par les hooks)
 - Hexdump : `offset | 16 octets hex | ASCII`
 - Statistiques : nb de zones, nb de blocs, fragmentation (plus grand bloc libre / total

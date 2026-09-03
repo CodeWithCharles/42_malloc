@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 14:36:57 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 11:57:54 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 15:23:52 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,15 @@
 # define FTM_INTERNAL_H
 
 # include "ftm_types.h"
+
+/* ---------------------------------- Debug --------------------------------- */
+
+t_debug			*ftm_debug(void);
+void			ftm_on_alloc(t_block *block);
+void			ftm_on_free(t_block *block);
+void			ftm_report_error(const char *message);
+
+/* ---------------------------------- Main ---------------------------------- */
 
 size_t      	ftm_round_up_to_alignment(size_t size);
 t_zone_kind 	ftm_size_class(size_t size);
@@ -74,6 +83,14 @@ bool			ftm_pointer_is_allocated(
 	t_zone *zone);
 
 void			ftm_show(void);
+void			ftm_show_ex(void);
+
+void			ftm_history_record(
+	char operation,
+	void *ptr,
+	size_t size);
+
+void			ftm_history_dump(void);
 
 void			ftm_release(void *ptr);
 void			*ftm_alloc(size_t size);

@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/01 17:32:02 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 14:42:22 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 14:59:58 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -148,4 +148,8 @@ void	ftm_fatal(const char *message)
 		write(STDERR_FILENO, "\n", 1);
 	}
 	abort();
+}
+
+void	ftm_debug_load(void)
+{
 }

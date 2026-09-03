@@ -6,11 +6,12 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:38:11 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 12:09:51 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 15:07:04 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ftm_internal.h"
+#include "ftm_port.h"
 
 static t_heap	g_heap;
 
@@ -39,6 +40,7 @@ static void	heap_init_if_needed(void)
 	if (g_heap.is_initialized)
 		return ;
 	g_heap.is_initialized = true;
+	ftm_debug_load();
 	heap_push_zone(FTM_TINY, 0);
 	heap_push_zone(FTM_SMALL, 0);
 }
@@ -76,6 +78,8 @@ void	*ftm_alloc(size_t size)
 	requested = size;
 	if (size == 0)
 		size = 1;
+	if (ftm_debug()->guard)
+		size += FTM_ALIGNMENT;
 	payload_size = ftm_round_up_to_alignment(size);
 	if (payload_size == 0)
 		return (NULL);
@@ -85,6 +89,7 @@ void	*ftm_alloc(size_t size)
 		return (NULL);
 	block->request_size = requested;
 	ftm_block_mark_used(block);
+	ftm_on_alloc(block);
 	return (ftm_block_payload(block));
 }
 
@@ -176,6 +181,7 @@ static void	heap_release_zone_if_free(t_zone *zone)
 
 static void	release_block(t_zone *zone, t_block *block)
 {
+	ftm_on_free(block);
 	ftm_block_mark_free(block);
 	ftm_block_coalesce_next(block);
 	if (block->prev != NULL && ftm_block_is_free(block->prev))

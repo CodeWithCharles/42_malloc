@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 12:37:40 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 11:58:52 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 14:49:27 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,20 @@
 
 # include "ftm_stdint.h"
 # include "ftm_config.h"
+
+/* ---------------------------------- Debug --------------------------------- */
+
+typedef struct s_debug
+{
+	bool			scribble;
+	bool			perturb_on;
+	bool			guard;
+	bool			abort_on_error;
+	unsigned char	perturb_byte;
+	size_t			error_count;
+} t_debug;
+
+/* ---------------------------------- Enum ---------------------------------- */
 
 typedef enum e_zone_kind
 {
@@ -30,6 +44,8 @@ typedef enum e_zone_kind
 # define FTM_BLOCK_CANARY	((uintptr_t)0x02)
 # define FTM_STATE_MASK		((uintptr_t)0xFF)
 # define FTM_BLOCK_MAGIC	((uintptr_t)0x4D464C00)
+
+/* --------------------------------- Structs -------------------------------- */
 
 typedef struct s_block
 {

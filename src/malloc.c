@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/01 17:30:28 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 12:20:21 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 15:23:04 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -167,4 +167,9 @@ void show_alloc_mem(void)
 	ftm_unlock();
 }
 
-void show_alloc_mem_ex(void) {}
+void show_alloc_mem_ex(void)
+{
+	ftm_lock();
+	ftm_show_ex();
+	ftm_unlock();
+}

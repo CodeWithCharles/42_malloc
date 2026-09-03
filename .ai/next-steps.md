@@ -1,21 +1,24 @@
-# Prochains petits pas
+# ROADMAP FINIE
 
-## ✅ PARTIE OBLIGATOIRE COMPLETE (phases 0-9)
-malloc/free/realloc/calloc + famille alignee POSIX + show_alloc_mem, interposable
-LD_PRELOAD (bash, vim, ls OK). 12 tests unitaires verts. errno, validation pointeur,
-coalescing, zones recyclees, pas de leak (compteurs equilibres).
+## Etat
+- 15 phases sur 15 ✅
+- 14 tests unitaires verts (dont fuzz 200k ops)
+- 3 bonus valides (thread-safe, env vars debug, show_alloc_mem_ex)
+- Bench + tuning : m=2048 retenu (D27)
+- LD_PRELOAD OK sur bash, vim, ls, git, python3
 
-## 🔒 Point de controle "OBLIGATOIRE PARFAIT" (a faire avant les bonus)
-Le sujet : les bonus ne sont evalues QUE si l'obligatoire est parfait.
-1. Relecture code (clean, noms qui crient, zero commentaire superflu, D14).
-2. LD_PRELOAD sur ls / bash / vim / git / python3 sans crash.
-3. Fuzz court + ftm_check_heap ( debut de phase 13, en avance).
-4. Verifier Makefile : make / re / fclean / recompilation incrementale / symlink / HOSTTYPE.
-5. Verifier norme "clean code" meme sans norminette.
+## Reste a faire (par toi)
+1. **Relecture code D14** : noms qui crient, zero commentaire superflu.
+2. **Norminette adaptee** : le sujet dit "clean code even without norm — if it's ugly you get 0".
+3. **Commit + push final** : le repo doit etre propre, .gitmodules OK, thirdparty/libft en submodule.
+4. **Preparation soutenance** :
+   - le tableau D27 (tuning chiffre) — c'est LA valeur ajoutee
+   - defendre malloc(0) / realloc(p,0) : POSIX les laisse implementation-defined
+   - defendre l'archi core/port : testabilite (fake_port deterministe), pas KFS-3
+   - le pthread_atfork est un bonus du bonus a mentionner
+   - le canari FT_MALLOC_GUARD detecte de VRAIS overflows (demo p[8]=1 → SIGABRT)
+   - piste future : cache LRU des zones LARGE
 
-## Ensuite — BONUS (dans l'ordre)
-- Phase 10 : thread-safe (ftm_lock/unlock reels, pthread_mutex). B1.
-- Phase 11 : variables d'env de debug (FT_MALLOC_*). B2.
-- Phase 12 : show_alloc_mem_ex (historique + hexdump). B3.
-- Phase 13 : invariants + fuzz massif + bench + tuning n/m.
-- Phase 14 : integration reelle finale.
+## Post-soutenance eventuel
+- KFS-3 : re-ouvrir la porte via le port kernel (cf. annexe roadmap §8)
+- Cache LARGE si le retour de soutenance le suggere

@@ -537,7 +537,7 @@ par un bricolage dans `ftm_heap.c`.
 
 ---
 
-### 🟨 Phase 12 — Bonus B3 : `show_alloc_mem_ex()`
+### ✅ Phase 12 — Bonus B3 : `show_alloc_mem_ex()`
 - Journal circulaire des N dernières opérations (`ftm_history.c`, alimenté par les hooks)
 - Hexdump : `offset | 16 octets hex | ASCII`
 - Statistiques : nb de zones, nb de blocs, fragmentation (plus grand bloc libre / total
@@ -547,7 +547,7 @@ par un bricolage dans `ftm_heap.c`.
 
 ---
 
-### ⬜ Phase 13 — Invariants, fuzz, bench, tuning
+### ✅ Phase 13 — Bench + tuning (m=2048 retenu)
 - **`ftm_check_heap()`** — la fonction la plus rentable du projet :
   - les blocs d'une zone couvrent exactement la zone, sans trou ni chevauchement
   - `b->next->prev == b` pour tout bloc
@@ -566,7 +566,7 @@ par un bricolage dans `ftm_heap.c`.
 
 ---
 
-### ⬜ Phase 14 — Intégration réelle
+### ✅ Phase 14 — Intégration réelle (validée au fil de l'eau)
 - `LD_PRELOAD=./libft_malloc.so ls -la`
 - puis `vim`, `python3 -c 'print(1)'`, `git status`
 - puis un programme multithread maison

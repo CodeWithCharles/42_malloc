@@ -317,3 +317,34 @@ Vars : FT_MALLOC_SCRIBBLE (0xDE au free), FT_MALLOC_PERTURB=n (au alloc), FT_MAL
 (canari dans [request_size, payload_size), guard force +ALIGNMENT a l'alloc), FT_MALLOC_ABORT
 (ftm_fatal sur erreur). Hooks ftm_on_alloc/on_free deja poses en phase 5 -> zero ligne de
 logique d'alloc modifiee (anticipation D6 validee). ftm_heap.c inclut desormais ftm_port.h.
+
+## D26 — show_alloc_mem_ex : hexdump + stats + history (2026-09-02)
+show_alloc_mem_ex reutilise le parcours de show_alloc_mem via drapeau statique g_extended
+dans print_block. Hexdump : min(request_size, 64) octets, format "16 hex | ASCII".
+Stats : zones, blocs, free bytes, largest free, map_calls, munmap_calls.
+History : ring buffer 256 entrees dans core/ftm_history.c, alimente par les hooks
+ftm_on_alloc/on_free (A/F, ptr, size). Le fuzz phase 13 (fait en 9) reste vert avec les
+hooks actifs = anticipation D6 confirmee.
+
+## D27 — Tuning final : m=2048 (2026-09-02)
+**Décision.** `FTM_SMALL_MAX = 2048` (au lieu de 1024 initial). `FTM_TINY_MAX = 128` conservé.
+
+**Mesures** (ns/op, bench 3 profils, LD_PRELOAD, page 4KB, x86_64 Linux) :
+
+| profil                           | glibc | m=1024 | m=2048 | m=4096 |
+|----------------------------------|------:|-------:|-------:|-------:|
+| small  (1-128 B, no realloc)     |  12   |  177   |  **161** |  175   |
+| mixed  (0-2048 B, 30% realloc)   |  32   |  250   |  **183** |  195   |
+| large  (2-10 KB, no realloc)     |  53   | 3051   |  **3116**| 5362   |
+
+**Pourquoi 2048.** Optimum sur les 3 profils. Amelioration nette mixed (-27%) et small (-9%),
+regression negligeable large (+2%). m=4096 gagnait sur mixed mais degradait large de +76%
+(thrashing de zones SMALL de 400KB avec des allocs de 2-4KB).
+
+**Non fait, cite en soutenance comme piste :** cache LRU des zones LARGE liberees (au lieu
+de munmap immediat + remmap au prochain malloc). Gain estime -40 a -60% sur large. Non
+implemente pour ne pas prendre le risque d'un bug tardif.
+
+**Ratio face a glibc reste x3 a x15 : defendable.** glibc a tcache (per-thread lock-free),
+seuil mmap dynamique, et arenas multiples — tous incompatibles avec la contrainte du sujet
+"une variable globale + une pour le thread-safe".

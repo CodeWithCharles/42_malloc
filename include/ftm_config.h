@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 11:53:58 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:37:14 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 17:00:58 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,7 +19,9 @@
 # define FTM_ALIGN_UP(x, a)	(((x) + ((a) - 1)) & ~((a) - 1))
 
 # define FTM_TINY_MAX       128
-# define FTM_SMALL_MAX      1024
+# ifndef FTM_SMALL_MAX
+#  define FTM_SMALL_MAX      1024
+# endif
 # define FTM_MIN_ALLOCS     100
 
 # define FTM_ZONE_SIZE(max_alloc, page_size, block_hdr, zone_hdr) \

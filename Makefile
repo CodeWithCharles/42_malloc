@@ -51,7 +51,29 @@ re: fclean all
 test:
 	$(call qcmd,$(MAKE) -C tests)
 
+# ----------------------------------- Bench ---------------------------------- #
+bench: $(BENCH_BIN)
+	$(call omsg,small profile   (1-128 bytes, no realloc))
+	$(call omsg,  glibc)
+	$(call qcmd,$(BENCH_BIN) small 200000)
+	$(call omsg,  ft_malloc)
+	$(call qcmd,LD_PRELOAD=$(CURDIR)/$(LINK_PATH) $(BENCH_BIN) small 200000)
+	$(call omsg,mixed profile   (0-2048 bytes, 30%% realloc))
+	$(call omsg,  glibc)
+	$(call qcmd,$(BENCH_BIN) mixed 200000)
+	$(call omsg,  ft_malloc)
+	$(call qcmd,LD_PRELOAD=$(CURDIR)/$(LINK_PATH) $(BENCH_BIN) mixed 200000)
+	$(call omsg,large profile   (2-10 KB, no realloc))
+	$(call omsg,  glibc)
+	$(call qcmd,$(BENCH_BIN) large 100000)
+	$(call omsg,  ft_malloc)
+	$(call qcmd,LD_PRELOAD=$(CURDIR)/$(LINK_PATH) $(BENCH_BIN) large 100000)
+
+$(BENCH_BIN): bench/bench_alloc.c
+	$(call qcmd,$(MKDIR) -p $(@D))
+	$(call bcmd,cc,$<,$(CC) -O2 $< -o $@)
+
 -include $(DEPS)
 
 .PHONY: all bonus all-ft-malloc clean fclean cleanlibs \
-fcleanlibs mrproper re test
+fcleanlibs mrproper re test bench

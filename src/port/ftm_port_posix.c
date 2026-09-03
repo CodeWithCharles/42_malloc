@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 14:20:39 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:37:07 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 14:41:25 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -62,14 +62,6 @@ void    ftm_unmap_pages(void *addr, size_t length)
 {
 	if (addr != NULL && length != 0)
 		munmap(addr, length);
-}
-
-void    ftm_lock(void)
-{
-}
-
-void    ftm_unlock(void)
-{
 }
 
 void    ftm_write(const char *buffer, size_t length)

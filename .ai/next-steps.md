@@ -1,13 +1,14 @@
 # Prochains petits pas
 
-## 🟨 Phase 8 — show_alloc_mem (en cours)
-`src/core/ftm_fmt.c` : formatage maison (hex, decimal) — PAS de printf (printf alloue).
-`src/core/ftm_show.c` : parcours zones triees par adresse croissante, blocs ALLOUES only,
-format exact du sujet, Total = somme des payloads alloues. Une seule ftm_write par ligne.
-Test compare la sortie au caractere pres (fake_port → adresses deterministes).
+## 🟨 Phase 9 — Robustesse + POSIX max (en cours, DERNIERE de l'obligatoire)
+1. Validation de pointeur (ftm_guard.c) : free/realloc d'un pointeur etranger, double-free,
+   pointeur au milieu d'un bloc → detectes, jamais de crash. Marqueur "magic" dans le header.
+2. errno = ENOMEM sur echec alloc (dans le shim src/malloc.c, PAS dans core).
+3. Famille alignee : posix_memalign, aligned_alloc, memalign, valloc, pvalloc,
+   malloc_usable_size, reallocarray. Over-allocation + offset stocke avant le pointeur.
+4. free() valide que le pointeur est a nous (sinon no-op) → survit a posix_memalign externe.
 
-Invariant acquis en phase 7 : classe d'une allocation vivante == classe de sa zone
-(garantit l'affichage sous le bon en-tete TINY/SMALL/LARGE).
+Cibles POSIX : cf. decisions D19/D21. Point delicat = alignement > 16 (over-alloc + offset).
 
-## Phase 9 — robustesse + famille de symboles (aligned_alloc, posix_memalign, ...)
-## Point de controle : obligatoire PARFAIT avant les bonus
+## Point de controle : OBLIGATOIRE PARFAIT
+Apres phase 9 : relire tout, LD_PRELOAD sur ls/vim, fuzz court. Puis bonus (10-12) et 13.

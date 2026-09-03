@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 14:36:57 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 17:52:16 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 11:18:14 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,6 +27,7 @@ void			ftm_block_mark_free(t_block *block);
 void			ftm_block_mark_used(t_block *block);
 t_block			*ftm_block_split(t_block *block, size_t payload_size);
 void			ftm_block_coalesce_next(t_block *block);
+bool			ftm_block_is_valid(const t_block *block);
 
 t_zone			*ftm_zone_create(t_zone_kind kind, size_t payload_size);
 void			ftm_zone_destroy(t_zone *zone);
@@ -42,6 +43,8 @@ bool			ftm_check_heap(void);
 
 size_t			ftm_fmt_hex(char *dst, uintptr_t value);
 size_t			ftm_fmt_udec(char *dst, size_t value);
+
+bool			ftm_pointer_is_allocated(void *ptr, t_zone *zone);
 
 void			ftm_show(void);
 

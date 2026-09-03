@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:31:28 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 17:04:35 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 11:19:11 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,7 +22,7 @@ t_block *ftm_block_split(t_block *block, size_t payload_size)
 		return (block);
 	remainder = (t_block *)((unsigned char *)ftm_block_payload(block) + payload_size);
 	remainder->payload_size = leftover - FTM_BLOCK_HEADER_SIZE;
-	remainder->flags = 0;
+	remainder->flags = FTM_BLOCK_MAGIC;
 	ftm_block_mark_free(remainder);
 	remainder->prev = block;
 	remainder->next = block->next;
@@ -44,4 +44,9 @@ void	ftm_block_coalesce_next(t_block *block)
 	block->next = next->next;
 	if (next->next != NULL)
 		next->next->prev = block;
+}
+
+bool	ftm_block_is_valid(const t_block *block)
+{
+	return ((block->flags & ~FTM_STATE_MASK) == FTM_BLOCK_MAGIC);
 }

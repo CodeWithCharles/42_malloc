@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:05:11 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:37:08 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 11:19:03 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -52,7 +52,7 @@ t_zone  *ftm_zone_create(t_zone_kind kind, size_t payload_size)
 		- FTM_BLOCK_HEADER_SIZE;
 	block->next = NULL;
 	block->prev = NULL;
-	block->flags = 0;
+	block->flags = FTM_BLOCK_MAGIC;
 	ftm_block_mark_free(block);
 	return (zone);
 }

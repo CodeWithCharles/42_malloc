@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 17:11:53 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 17:51:04 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 11:23:33 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -68,7 +68,7 @@ void	*ftm_resize(void *ptr, size_t size)
 		return (ftm_alloc(0));
 	}
 	zone = ftm_heap_find_zone(ptr);
-	if (zone == NULL)
+	if (zone == NULL || !ftm_pointer_is_allocated(ptr, zone))
 		return (NULL);
 	new_payload = ftm_round_up_to_alignment(size);
 	if (new_payload == 0)

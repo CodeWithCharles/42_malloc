@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 12:37:40 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 18:12:46 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 11:17:17 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,8 +24,10 @@ typedef enum e_zone_kind
 	FTM_ZONE_KIND_COUNT = 3
 } t_zone_kind;
 
-# define FTM_BLOCK_FREE     (1U << 0)
-# define FTM_BLOCK_CANARY   (1U << 1)
+# define FTM_BLOCK_FREE		((uintptr_t)0x01)
+# define FTM_BLOCK_CANARY	((uintptr_t)0x02)
+# define FTM_STATE_MASK		((uintptr_t)0xFF)
+# define FTM_BLOCK_MAGIC	((uintptr_t)0x4D464C00)
 
 typedef struct s_block
 {

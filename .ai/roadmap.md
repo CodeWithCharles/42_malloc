@@ -457,7 +457,7 @@ descendant, et vérifie que les octets survivants sont intacts.
 
 ---
 
-### 🟨 Phase 8 — `show_alloc_mem()`
+### ✅ Phase 8 — `show_alloc_mem()`
 - Zones triées par adresse croissante, blocs **alloués** uniquement
 - Format strict du sujet ; `Total` = somme des payloads alloués, **pas** la taille des zones
 - `ftm_fmt.c` : ton propre `hex()` et `udec()` écrivant dans un buffer sur la pile, puis
@@ -468,7 +468,7 @@ caractère par caractère à une chaîne attendue.
 
 ---
 
-### ⬜ Phase 9 — Robustesse et famille complète des symboles
+### 🟨 Phase 9 — Robustesse + POSIX (errno, famille alignée, validation)
 *« In no way can your function lead to undefined behaviour or segv. »*
 
 Cas à couvrir dans `ftm_guard.c` :

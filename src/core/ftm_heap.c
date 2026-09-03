@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:38:11 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 18:12:29 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/03 11:22:24 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -182,7 +182,7 @@ void	ftm_release(void *ptr)
 	if (ptr == NULL)
 		return ;
 	zone = ftm_heap_find_zone(ptr);
-	if (zone == NULL)
+	if (zone == NULL || !ftm_pointer_is_allocated(ptr, zone))
 		return ;
 	block = ftm_payload_to_block(ptr);
 	ftm_block_mark_free(block);

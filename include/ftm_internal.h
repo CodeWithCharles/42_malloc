@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 14:36:57 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 15:23:52 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 12:10:30 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -97,5 +97,17 @@ void			*ftm_alloc(size_t size);
 void			*ftm_resize(
 	void *ptr,
 	size_t size);
+
+t_zone			*ftm_large_cache_take(size_t payload_size);
+t_zone			*ftm_large_cache_put(t_zone *zone);
+void			ftm_large_cache_flush(void);
+
+/* --------------------------------- Mapping -------------------------------- */
+
+void			ftm_zone_map_insert(t_zone *zone);
+void			ftm_zone_map_remove(t_zone *zone);
+t_zone			*ftm_zone_map_lookup(void *ptr);
+bool			ftm_zone_map_is_active(void);
+void			ftm_zone_map_reset(void);
 
 #endif

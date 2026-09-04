@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 12:37:40 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 14:49:27 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 12:34:37 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -64,12 +64,24 @@ typedef struct s_zone
 	t_zone_kind     kind;
 } t_zone;
 
+typedef struct	s_zone_map_entry
+{
+	uintptr_t	page;
+	t_zone		*zone;
+} t_zone_map_entry;
+
 typedef struct s_heap
 {
-	t_zone  *zones[FTM_ZONE_KIND_COUNT];
-	size_t  map_calls;
-	size_t  unmap_calls;
-	bool    is_initialized;
+	t_zone  			*zones[FTM_ZONE_KIND_COUNT];
+	t_zone				*large_cache;
+	t_zone_map_entry	zone_map[FTM_ZONE_MAP_CAPACITY];
+	size_t				zone_map_live;
+	bool				zone_map_disabled;
+	size_t				large_cache_count;
+	size_t				large_cache_hits;
+	size_t  			map_calls;
+	size_t  			unmap_calls;
+	bool    			is_initialized;
 } t_heap;
 
 # define FTM_ALIGN_MAGIC		((uintptr_t)0x414C4D42)
@@ -93,5 +105,7 @@ _Static_assert(FTM_BLOCK_HEADER_SIZE % FTM_ALIGNMENT == 0,
 	"block header size must be a multiple of alignment");
 _Static_assert(FTM_ZONE_HEADER_SIZE % FTM_ALIGNMENT == 0,
 	"zone header size must be a multiple of alignment");
+_Static_assert((FTM_ZONE_MAP_CAPACITY & (FTM_ZONE_MAP_CAPACITY - 1)) == 0,
+	"zone map capacity must be a power of two");
 
 #endif

@@ -1,29 +1,36 @@
-# ROADMAP FINIE
+# Prochains petits pas
 
-> **Session en cours sur cette branche** : re-coder l'optimisation LARGE en mode
-> `collab-pairing-mentor`. Tout le briefing est dans `.ai/mentor-large-perf.md` —
-> c'est LE document à suivre, les étapes ci-dessous (relecture, soutenance) restent
-> valables pour le rendu final sur master.
+## Session LARGE : TERMINÉE ✅
+`large` 3418 → 218-240 ns/op (**×14-15**), témoins neutres, 16/16 tests.
+Détail : D28→D31 dans `decisions.md`. Bilan de session : `state.md`.
 
-## Etat
-- 15 phases sur 15 ✅
-- 14 tests unitaires verts (dont fuzz 200k ops)
-- 3 bonus valides (thread-safe, env vars debug, show_alloc_mem_ex)
-- Bench + tuning : m=2048 retenu (D27)
-- LD_PRELOAD OK sur bash, vim, ls, git, python3
+## À faire tout de suite
+1. **Commit.** Trois fichiers encore untracked :
+   `src/core/ftm_large_cache.c`, `src/core/ftm_zone_map.c`, `tests/test_large_cache.c`.
+2. **Correctif `run_tests.sh`** (cf. D30) : dériver la liste des tests depuis les sources
+   `test_*.c`, pas depuis les binaires de `build/`. Un binaire orphelin ne doit plus
+   pouvoir compter comme un succès.
+3. **Relecture D14** du code ajouté : noms qui crient, zéro commentaire superflu.
 
-## Reste a faire (par toi)
-1. **Relecture code D14** : noms qui crient, zero commentaire superflu.
-2. **Norminette adaptee** : le sujet dit "clean code even without norm — if it's ugly you get 0".
-3. **Commit + push final** : le repo doit etre propre, .gitmodules OK, thirdparty/libft en submodule.
-4. **Preparation soutenance** :
-   - le tableau D27 (tuning chiffre) — c'est LA valeur ajoutee
-   - defendre malloc(0) / realloc(p,0) : POSIX les laisse implementation-defined
-   - defendre l'archi core/port : testabilite (fake_port deterministe), pas KFS-3
-   - le pthread_atfork est un bonus du bonus a mentionner
-   - le canari FT_MALLOC_GUARD detecte de VRAIS overflows (demo p[8]=1 → SIGABRT)
-   - piste future : cache LRU des zones LARGE
+## Rendu 42
+Le projet reste conforme : cache et map vivent dans `g_heap` (une seule variable globale),
+zéro métadonnée allouée dynamiquement, garantie « no segv » préservée, et le cache réduit
+les `munmap` — explicitement demandé par le sujet.
 
-## Post-soutenance eventuel
-- KFS-3 : re-ouvrir la porte via le port kernel (cf. annexe roadmap §8)
-- Cache LARGE si le retour de soutenance le suggere
+### Arguments de soutenance sur cette optimisation
+- **Le ×45 initial contre la glibc n'était pas un écart d'implémentation.** Preuve :
+  `MALLOC_MMAP_THRESHOLD_=1 ./bench_alloc large 100000` → glibc à 3737 ns/op, soit plus
+  lente que notre baseline (3418). À contrainte égale, ft_malloc est aujourd'hui
+  **15,6× plus rapide qu'elle**.
+- **La démarche vaut autant que le résultat** : le pas A (skip du scan) mesuré isolément
+  était une **régression de 77 %** (D28) — le briefing se trompait en affirmant que ce
+  scan échouait à 100 %. Il fallait le cache pour que A devienne un gain (D29). Savoir
+  raconter ça montre une méthode expérimentale, pas de la chance.
+- **Un test qui passait sans source** (D30) : binaire orphelin d'une autre branche resté
+  dans `build/`. Trouvé en vérifiant, pas en faisant confiance au compteur de tests.
+
+## Post-soutenance éventuel
+- KFS-3 : le port kernel (cf. roadmap §8). La page map est littéralement une table
+  inversée page→zone : bon entraînement avant la pagination de KFS-3.
+- Réutilisation O(1) des résidus de zones LARGE (indexer les zones partiellement libres),
+  pour récupérer l'efficacité mémoire que le pas A a échangée contre de la vitesse.

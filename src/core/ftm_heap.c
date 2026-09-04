@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:38:11 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 15:07:04 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 12:34:18 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,14 +24,22 @@ static t_zone	*heap_push_zone(t_zone_kind kind, size_t payload_size)
 {
 	t_zone	*zone;
 	
-	zone = ftm_zone_create(kind, payload_size);
+	zone = NULL;
+	if (kind == FTM_LARGE)
+		zone = ftm_large_cache_take(payload_size);
 	if (zone == NULL)
-		return (NULL);
+	{
+		zone = ftm_zone_create(kind, payload_size);
+		if (zone == NULL)
+			return (NULL);
+		g_heap.map_calls++;
+	}
+	zone->prev = NULL;
 	zone->next = g_heap.zones[kind];
 	if (g_heap.zones[kind] != NULL)
 		g_heap.zones[kind]->prev = zone;
 	g_heap.zones[kind] = zone;
-	g_heap.map_calls++;
+	ftm_zone_map_insert(zone);
 	return (zone);
 }
 
@@ -51,7 +59,7 @@ static t_block	*heap_reserve_block(t_zone_kind kind, size_t payload_size)
 	t_block	*block;
 
 	zone = g_heap.zones[kind];
-	while (zone != NULL)
+	while (zone != NULL && kind != FTM_LARGE)
 	{
 		block =	ftm_zone_find_free(zone, payload_size);
 		if (block != NULL)
@@ -112,8 +120,11 @@ void	ftm_heap_reset(void)
 		g_heap.zones[kind] = NULL;
 		kind++;
 	}
+	ftm_large_cache_flush();
+	ftm_zone_map_reset();
 	g_heap.map_calls = 0;
 	g_heap.unmap_calls = 0;
+	g_heap.large_cache_hits = 0;
 	g_heap.is_initialized = false;
 }
 
@@ -123,6 +134,8 @@ t_zone	*ftm_heap_find_zone(void *ptr)
 	unsigned char	*address;
 	int				kind;
 
+	if (ftm_zone_map_is_active())
+		return (ftm_zone_map_lookup(ptr));
 	address = ptr;
 	kind = 0;
 	while (kind < FTM_ZONE_KIND_COUNT)
@@ -165,6 +178,8 @@ static size_t	count_zones(t_zone_kind kind)
 
 static void	heap_release_zone_if_free(t_zone *zone)
 {
+	t_zone	*evicted;
+
 	if (!zone_is_fully_free(zone))
 		return ;
 	if (zone->kind != FTM_LARGE && count_zones(zone->kind) <= 1)
@@ -175,6 +190,14 @@ static void	heap_release_zone_if_free(t_zone *zone)
 		g_heap.zones[zone->kind] = zone->next;
 	if (zone->next != NULL)
 		zone->next->prev = zone->prev;
+	ftm_zone_map_remove(zone);
+	if (zone->kind == FTM_LARGE)
+	{
+		evicted = ftm_large_cache_put(zone);
+		if (evicted == NULL)
+			return ;
+		zone = evicted;
+	}
 	ftm_zone_destroy(zone);
 	g_heap.unmap_calls++;
 }

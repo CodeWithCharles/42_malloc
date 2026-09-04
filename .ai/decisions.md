@@ -348,3 +348,93 @@ implemente pour ne pas prendre le risque d'un bug tardif.
 **Ratio face a glibc reste x3 a x15 : defendable.** glibc a tcache (per-thread lock-free),
 seuil mmap dynamique, et arenas multiples — tous incompatibles avec la contrainte du sujet
 "une variable globale + une pour le thread-safe".
+
+## D28 — Le briefing se trompe : le scan LARGE n'échouait PAS à 100 % (2026-09-04)
+
+**Constat mesuré (pas 2 de la session, A/B sur la machine de Charles).**
+
+| variante                 | ns/op (médiane 3 runs) | mmap   | munmap | syscalls |
+|--------------------------|-----------------------:|-------:|-------:|---------:|
+| avec scan (état d'avant) |                  3 418 | 17 190 | 17 167 |   34 357 |
+| sans scan (pas A seul)   |                  6 055 | 50 147 | 50 124 |  100 271 |
+
+Le pas A **seul** est une régression de +77 %, pas un gain « modeste » comme l'annonce
+`mentor-large-perf.md`. Le nombre de syscalls est multiplié par 2,9.
+
+**Pourquoi le briefing a tort.** Il postule qu'une zone LARGE vivante est occupée « par
+construction (1 bloc) ». Faux, à cause de deux effets cumulés :
+1. `ftm_zone_total_size` arrondit à la page → `ftm_block_split` laisse un résidu libre de
+   0 à ~4 Ko dans **chaque** zone LARGE (ex. demande 5008 → zone 8192 → bloc 8112 →
+   résidu 3056).
+2. Si ce résidu est servi à une 2e demande LARGE, la zone porte 2 allocations ; libérer
+   l'une ne la rend pas « fully free », donc pas de munmap, et elle laisse un bloc libre
+   réutilisable. Ces zones s'accumulent en **cache accidentel** — il absorbait 2/3 des
+   allocations LARGE.
+
+**Décision.** On garde le pas A et on enchaîne sur le cache (pas B), qui est le mécanisme
+de réutilisation *explicite* et O(1) censé remplacer ce cache accidentel. Mais on ne prend
+plus pour argent comptant que A est un gain : **à la fin de la session, mesurer A+B+C
+contre B+C seuls** (le `&& kind != FTM_LARGE` est un flip d'une ligne) et trancher sur
+les chiffres. Si B+C sans A est meilleur, on retire A.
+
+**Note de méthode.** La variance du bench est de l'ordre de 10 % (baseline mesurée à 3 120
+au pas 1, re-mesurée à 3 418 au pas 2, même binaire) : ne pas conclure sur un écart < 15 %
+sans plusieurs runs.
+
+## D29 — Le pas A est validé PAR LA MESURE, une fois le cache en place (2026-09-04)
+
+Résolution de la question ouverte de [[D28]]. Médianes sur 3 runs, machine de Charles :
+
+| variante                  | large | small | mixed |
+|---------------------------|------:|------:|------:|
+| baseline (ni A ni cache)  |  3418 |   176 |   202 |
+| cache seul (sans A)       |  1212 |   159 |   179 |
+| **cache + A (retenu)**    | **1031** | 155 |   187 |
+
+Le pas A vaut **−77 % isolé** mais **+15 % avec le cache** (intervalles disjoints :
+1191-1219 sans A contre 1016-1062 avec). L'hypothèse d'antagonisme est confirmée : le scan
+occupe les résidus → les zones ne deviennent jamais « fully free » → le cache est affamé.
+A et le cache ne s'additionnent pas, le second **remplace** le premier, en O(32) au lieu
+de O(~256).
+
+**Décision : on garde le pas A.** Gain cumulé à ce stade ×3,3 sur la baseline, témoins
+`small`/`mixed` neutres. Reste à traiter : `ftm_heap_find_zone` en O(n) (pas 5).
+
+## D30 — Test fantôme : run_tests.sh itère sur les binaires, pas sur les sources (2026-09-04)
+
+`make test` rapportait `PASS test_large_cache` alors que `tests/test_large_cache.c`
+n'existe pas sur master. `tests/build/test_large_cache` était un binaire résiduel de la
+branche exploratoire `large_opti` (daté du 03/09 18:22 contre 04/09 12:03 pour les
+autres) : `git checkout` ne nettoie pas `tests/build/`. Le suite tournait donc à
+15 tests réels + 1 faux positif entièrement lié contre du code disparu.
+
+**Correctif immédiat** : suppression du binaire orphelin.
+**Correctif structurel à faire** : `run_tests.sh` doit dériver la liste des tests depuis
+les sources `test_*.c` et non depuis le contenu de `build/`. Un test dont la source
+disparaît doit disparaître du rapport.
+
+## D31 — Page map : résultat final ×14,2 sur le profil LARGE (2026-09-04)
+
+Table de hachage statique (open addressing, sondage linéaire, tombstones) dans `g_heap`,
+indexant **chaque page de chaque zone listée** → `ftm_heap_find_zone` en O(1).
+8192 entrées × 16 o = 128 Ko en BSS. Repli automatique sur le parcours linéaire si
+saturation (`zone_map_disabled`, tout-ou-rien par zone).
+
+**Résultats (médianes, machine de Charles)** :
+
+| profil  | glibc | glibc mmap_thr=1 | baseline | + cache + A | **+ page map** | gain   |
+|---------|------:|-----------------:|---------:|------------:|---------------:|-------:|
+| `large` |  56.9 |             3737 |     3418 |        1031 |        **240** | **×14,2** |
+| `small` |     — |                — |      176 |         155 |            166 | neutre |
+| `mixed` |     — |                — |      202 |         187 |            191 | neutre |
+
+**Meilleur que le prototype de référence** (~320 ns/op annoncés dans le briefing).
+Face à la glibc placée sous la même contrainte mmap, ft_malloc est désormais **15,6× plus
+rapide** ; l'écart ×4,2 restant avec sa config par défaut ne mesure que sa liberté de ne
+pas faire de syscall sous 128 Ko.
+
+**Aucune contrainte du sujet cassée** : cache et map vivent dans `g_heap` (une seule
+variable globale), zéro métadonnée allouée dynamiquement, et le cache *réduit* le nombre
+de `munmap` — ce que le sujet demande explicitement. La garantie « no segv » est conservée
+(la map ne remplace pas la validation de pointeur, elle accélère seulement la localisation
+de la zone).

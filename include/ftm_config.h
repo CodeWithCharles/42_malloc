@@ -20,7 +20,9 @@
 
 /* ---------------------------------- Sizes --------------------------------- */
 
-# define FTM_TINY_MAX       			128
+# ifndef FTM_TINY_MAX
+#  define FTM_TINY_MAX      			128
+# endif
 # ifndef FTM_SMALL_MAX
 #  define FTM_SMALL_MAX      			2048
 # endif

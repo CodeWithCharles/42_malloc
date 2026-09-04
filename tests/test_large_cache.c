@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/04 12:38:05 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 12:41:03 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 16:52:52 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -93,7 +93,11 @@ static int	test_map_tracks_live_zones(void)
 	CHECK(ftm_zone_map_lookup(large)->kind == FTM_LARGE);
 	CHECK(ftm_zone_map_lookup(small) == ftm_heap_find_zone(small));
 	ftm_release(large);
-	CHECK(ftm_zone_map_lookup(large) == NULL);
+	CHECK(ftm_zone_map_lookup(large) != NULL);
+	CHECK(ftm_heap_instance()->zone_count[FTM_LARGE] == 0);
+	CHECK(ftm_heap_instance()->large_cache_count == 1);
+	ftm_release(large);
+	CHECK(ftm_check_heap());
 	ftm_release(small);
 	CHECK(ftm_check_heap());
 	return (0);

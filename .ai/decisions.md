@@ -672,3 +672,119 @@ il suffirait de lever le drapeau si ça tient) mais la question du *quand* tente
 reconstruction ajoute de la machinerie. Avec une capacité dimensionnée à 4× la charge, le
 cas est jugé assez improbable pour être documenté plutôt que codé. À rouvrir si un profil
 réel le déclenche.
+
+## D39 — Étape 3 (boundary tags) ANNULÉE : arithmétique faite avant d'écrire (2026-09-04)
+
+Calcul des formats d'en-tête possibles, `FTM_ALIGNMENT` = 16 :
+
+| format                        | champs                                  | sizeof | en-tête | zone TINY | allocs/zone |
+|-------------------------------|-----------------------------------------|-------:|--------:|----------:|------------:|
+| actuel                        | payload, request, next, prev, flags      |     40 |  **48** |   5 pages |         116 |
+| sans `request_size`           | payload, next, prev, flags               |     32 |  **32** | **4 pages** |       102 |
+| boundary tags + flags séparés | payload, prev_size, flags                |     24 |  **32** |   4 pages |         102 |
+| boundary tags packés          | payload\|flags, prev_size                |     16 |  **16** |   4 pages |         113 |
+
+**Les boundary tags ne rapportent rien.** Remplacer `next`/`prev` par de l'arithmétique
+fait passer la structure de 32 à 24 octets, mais l'arrondi à 16 réabsorbe intégralement le
+gain : même en-tête de 32 que la simple suppression de `request_size`, pour une réécriture
+de `ftm_block.c`, `ftm_zone.c`, `ftm_check.c` et `ftm_show.c`.
+
+**La version 16 octets casse le sujet.** Elle exige d'empaqueter les drapeaux dans les bits
+bas de la taille, donc de sacrifier `FTM_BLOCK_MAGIC` (24 bits significatifs aujourd'hui).
+Or `ftm_block_is_valid` est ce qui rend sûr le `free` d'un pointeur au milieu d'un bloc :
+sans lui, on interprète des octets arbitraires comme un en-tête et on libère un bloc
+fantôme — exactement le comportement glibc, et exactement ce que le sujet interdit
+(« in no way can your function lead to undefined behaviour or segv »). Un magic sur 4 bits
+laisserait passer un pointeur invalide sur seize. → déplacé dans `perf-hors-sujet.md`.
+
+**Ce qui reste de l'étape 3** : la suppression de `request_size` seule capture tout le gain
+mémoire réel — en-tête 48 → 32, zone TINY 5 → 4 pages (−20 %), surcoût d'une alloc de
+128 o de 37,5 % à 25 %. Une ligne, zéro risque. Contrepartie : `show_alloc_mem` afficherait
+la taille utilisable (sémantique `malloc_usable_size(3)`) au lieu de la taille demandée,
+soit l'inverse de [[D20]]. **Décision de Charles.**
+
+## D40 — V1 mesuré : garder les zones cachées dans la page map (−35 % sur `large`) (2026-09-04)
+
+**Observation.** Sur un cache **hit** LARGE, la zone était retirée de la page map au `put`
+puis ré-insérée au `take` — 4 à 6 opérations de hachage par cycle alloc/free pour une zone
+qui n'a pas changé d'adresse.
+
+**Prototype (copie du dépôt en scratchpad, dépôt de Charles non modifié)** : ne retirer de
+la map qu'au moment de la **destruction** réelle (donc après l'éviction du cache), et ne
+pas ré-insérer une zone qui revient du cache.
+
+Résultat : `large` **129 → 84 ns/op (−35 %)**, 15/16 tests verts.
+
+**Le seul test qui tombe est `test_large_cache:96`**, qui assertait
+`ftm_zone_map_lookup(large) == NULL` après un `free` — c'est-à-dire l'ancien invariant
+« la map ne contient que des zones listées ». C'est cet invariant qu'on change
+délibérément ; le test doit suivre le code, pas l'inverse.
+
+**Sûreté de l'invariant relâché.** Un `free` d'un pointeur situé dans une zone *cachée*
+trouve désormais la zone au lieu de renvoyer `NULL`. Il reste sans danger :
+`ftm_pointer_is_allocated` échoue (le bloc unique d'une zone cachée est libre), puis
+`ftm_aligned_base` échoue à son tour, et l'appel est ignoré — même issue qu'avant, par un
+chemin différent. `release_block` n'est jamais atteint, donc aucun risque de manipuler une
+zone hors de `zones[kind]`.
+
+## D41 — Baseline vitesse + mémoire avant la série V1/V2/V4/V5/M1/M2/M3 (2026-09-04)
+
+Bench instrumenté : `VmPeak` (pic virtuel) et `VmHWM` (pic résident) lus depuis
+`/proc/self/status` via `open`/`read` (pas `stdio`, qui rentrerait dans notre propre
+malloc pendant la mesure). Médianes sur **5 runs** — 3 runs s'étaient révélés insuffisants,
+la dispersion atteignant 20 %.
+
+| profil  | ns/op (médiane/5) | VmPeak   | VmHWM     |
+|---------|------------------:|---------:|----------:|
+| `small` |          **54,8** | 2 708 Ko | ~1 556 Ko |
+| `mixed` |          **97,8** | 2 688 Ko | ~1 788 Ko |
+| `large` |         **133,4** | 5 720 Ko | ~4 580 Ko |
+
+**Le bench n'écrit jamais dans la mémoire allouée**, donc `VmHWM` ne mesure que les pages
+touchées par l'allocateur lui-même (en-têtes de blocs et de zones). C'est suffisant pour
+comparer des variantes, mais ça ne reflète pas la charge d'un vrai programme.
+
+**Bimodalité sur `small`** : deux groupes nets (52-55 et 64-65), probablement de la mise à
+l'échelle de fréquence. Un gain inférieur à 15 % y restera indécidable.
+
+## D42 — M1 est finalement faisable SANS compromis : le delta dans les bits hauts de `flags`
+
+Question de Charles : comment la glibc affiche-t-elle la taille demandée si elle ne la
+stocke pas ? **Réponse : elle ne l'affiche pas.** `malloc_usable_size(3)` renvoie la taille
+*utilisable* (sa doc précise « may be more than the requested size ») ; `mallinfo()` et
+`malloc_stats()` ne manipulent que des agrégats de tailles de chunks. L'information est
+perdue au retour de `malloc`. Seuls des **outils de debug** la conservent, en assumant le
+surcoût : `mcheck` (glibc) ajoute un en-tête, ASan la range dans ses redzones, valgrind
+tient des structures fantômes.
+
+**Troisième voie retenue.** Ne pas stocker `request_size` mais le **delta**
+`payload_size − request_size`, borné par ~100 (arrondi d'alignement + refus de split +
+marge de `FT_MALLOC_GUARD`). Le champ `flags` est un `uintptr_t` dont **les bits 32-63 sont
+libres** (état sur 0-7, magic sur 8-31). Le delta y tient largement.
+
+Résultat : `t_block` = `payload_size` + `next` + `prev` + `flags` = 32 octets → en-tête
+**32 au lieu de 48**, zone TINY 5 → 4 pages (−20 %), et `show_alloc_mem` affiche toujours
+la taille demandée exacte via `payload_size - delta`. **Aucun compromis.**
+
+Adaptation nécessaire : `ftm_block_is_valid` teste `(flags & ~FTM_STATE_MASK) ==
+FTM_BLOCK_MAGIC`, ce qui exige des bits hauts nuls. Il faudra masquer explicitement les
+bits 8-31 (`FTM_MAGIC_MASK = 0xFFFFFF00`). M1 remis dans la file, après V1/V2/V4/V5.
+
+## D43 — V1 implémenté : zones cachées conservées dans la page map (2026-09-04)
+
+| profil  | baseline | V1        | écart               | VmPeak          |
+|---------|---------:|----------:|---------------------|-----------------|
+| `small` |     54,8 |      57,4 | +4,8 % (bruit)      | 2708 → 2676 Ko  |
+| `mixed` |     97,8 |      92,9 | −5,1 %              | 2688 → 2656 Ko  |
+| `large` |    133,4 |  **89,7** | **−32,7 %**         | 5720 → 5688 Ko  |
+
+Médianes sur 5 runs. 16/16 tests. **La mémoire baisse légèrement partout** : on ne retient
+aucune zone de plus, on supprime seulement 4 à 6 opérations de hachage par cycle
+alloc/free LARGE. Le +4,8 % sur `small` tombe dans la bimodalité identifiée en D41 — ce
+profil ne touche jamais au cache LARGE, il ne peut structurellement pas être affecté.
+
+Ratios face à la glibc : ×5,0 / ×3,2 / **×1,6**.
+
+`test_large_cache` documente désormais le nouvel invariant : une zone cachée **reste dans
+la map** (retrouvable en O(1) au retour) mais quitte `zones[kind]` et entre dans le cache.
+Le test exerce aussi le `free` d'un pointeur dont la zone est en cache.

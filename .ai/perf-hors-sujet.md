@@ -101,7 +101,29 @@ compromis sûreté/vitesse. On a gardé la garantie ET la vitesse.
 
 ---
 
-## 5. Pour KFS-3
+## 5. En-tête de bloc à 16 octets (boundary tags packés)
+
+**Ce que fait la glibc.** Son en-tête de chunk fait 16 octets : `prev_size` + `size`, les
+drapeaux logés dans les bits bas de `size` (toujours aligné, donc les 4 bits bas sont
+libres). Pas de magic, pas de validation.
+
+**Pourquoi c'est interdit.** Il n'y a plus de place pour `FTM_BLOCK_MAGIC` (24 bits
+significatifs chez nous), or `ftm_block_is_valid` est ce qui rend sûr le `free` d'un
+pointeur au milieu d'un bloc. Sans lui, on interprète des octets arbitraires comme un
+en-tête et on libère un bloc fantôme — précisément le comportement glibc, et précisément
+ce que le sujet interdit. Un magic sur 4 bits laisserait passer un pointeur invalide sur
+seize.
+
+**Gain réel — modeste.** En-tête 32 → 16 : la zone TINY reste à 4 pages (l'arrondi page
+absorbe la différence), seule la densité progresse, 102 → 113 allocations par zone, soit
++11 %. Sur une alloc de 128 octets, le surcoût passe de 25 % à 12,5 %.
+
+**Verdict.** Sacrifier la garantie « no segv » pour 11 % de densité n'est pas un échange
+raisonnable — d'autant que le sujet en fait une exigence explicite. Cf. D39.
+
+---
+
+## 6. Pour KFS-3
 
 Aucune de ces contraintes ne s'applique dans un kernel :
 - un `kfree` sur pointeur invalide qui déclenche un `kernel_panic` est le comportement

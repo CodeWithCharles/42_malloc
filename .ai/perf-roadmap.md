@@ -155,7 +155,14 @@ d'ajouter des `CHECK(ftm_check_heap())` dans `test_free_coalesce`.
 
 ---
 
-## Étape 3 — Boundary tags (structurel, le plus formateur)
+## Étape 3 — Boundary tags — ❌ ANNULÉE (arithmétique faite, cf. D39)
+
+> Les boundary tags donnent le MÊME en-tête (32) que la simple suppression de
+> `request_size`, l'alignement 16 réabsorbant le gain. La version 16 octets exige de
+> sacrifier `FTM_BLOCK_MAGIC`, donc la garantie « no segv » → hors sujet, déplacée dans
+> `perf-hors-sujet.md`. Seule subsiste la suppression de `request_size` (§4.1).
+
+### Analyse d'origine (conservée pour mémoire)
 
 **Objectif.** Passer l'en-tête de bloc de 48 à **16 octets**, et rendre la navigation
 arithmétique au lieu du pointer chasing.
@@ -262,3 +269,54 @@ L'étape 4.1 devient sans objet si on fait l'étape 3 : à trancher au moment d'
 2. 3 runs par profil, comparer les **médianes**, ne rien conclure sous 15 % ;
 3. `LD_PRELOAD` sur `ls`, `python3`, `git` ;
 4. consigner le chiffre dans `decisions.md` — y compris (surtout) si c'est une régression.
+
+---
+
+# Catalogue des optimisations restantes (2026-09-04)
+
+État de départ : `small` 54, `mixed` 92, `large` 129 ns/op.
+En **gras** = mesuré ; le reste est estimé et signalé comme tel.
+
+## Vitesse
+
+| #  | Optimisation                                   | Sujet | glibc | Gain                              | Statut |
+|----|------------------------------------------------|:-----:|:-----:|-----------------------------------|--------|
+| V1 | Garder les zones cachées dans la page map      |  ✅   |  s.o. | **`large` 129 → 84 (−35 %)**      | **mesuré** (proto en scratchpad) |
+| V2 | Free lists ségrégées par classe (bins)         |  ✅   |  ✅   | `mixed` ~−38 %, `small` ~−16 %    | parcours mesuré 23,2/5,7/1,0 maillons |
+| V3 | `realloc` : absorber aussi le bloc précédent   |  ✅   |  ❌   | niche, `mixed`                    | spéculatif (impose un memmove) |
+| V4 | `calloc` : pas de `memset` sur zone neuve      |  ✅   |  ✅   | gros sur charge `calloc`          | non couvert par les benchs |
+| V5 | Index O(1) des zones ayant de la place         |  ✅   |  ✅   | faible (2 zones TINY)             | non chiffré |
+| V6 | tcache par thread                              |  ❌   |  ✅   | `small` → ~25 ns                  | hors sujet |
+| V7 | Tas contigu `brk`/`sbrk`                       |  ❌   |  ✅   | supprime le mmap sur `large`      | hors sujet |
+| V8 | `free` sans validation                         |  ❌   |  ✅   | marginal depuis la page map       | hors sujet (D36) |
+| V9 | Supprimer le verrou                            |  ❌   |  ✅   | 4,1 ns = 7 % de `small`           | hors sujet, dépend de V6 |
+
+## Mémoire
+
+| #  | Optimisation                          | Sujet | glibc | Gain                          | Statut |
+|----|---------------------------------------|:-----:|:-----:|-------------------------------|--------|
+| M1 | Supprimer `request_size`              |  ✅   |  ✅   | zone TINY 5 → 4 pages (−20 %) | **refusé** par Charles (D20/D39) |
+| M2 | Réutiliser les résidus des zones LARGE|  ✅   |  ✅   | jusqu'à 4 Ko / zone LARGE     | non chiffré |
+| M3 | `FIT_FACTOR` 2 → 1,5                  |  ✅   |  s.o. | moins de gaspillage / zone    | un `--cflags`, non mesuré |
+| M4 | Page map 4096 → 2048                  |  ✅   |  s.o. | BSS 64 → 32 Ko                | possible, marge ×2,2 (D38) |
+| M5 | Cache 2 étages + `MADV_FREE`          |  ⚠️   |  ✅   | RSS du cache / 8              | repoussé (D36) |
+| M6 | Boundary tags 16 octets               |  ❌   |  ✅   | +11 % densité                 | hors sujet (D39) |
+
+## Donnée clé : longueur du parcours des free lists
+
+Mesuré sur 200 000 opérations par profil :
+
+| profil  | appels à `find` | maillons parcourus | maillons/appel |
+|---------|----------------:|-------------------:|---------------:|
+| `small` |         135 665 |            767 881 |       **5,66** |
+| `mixed` |         121 914 |          2 823 762 |      **23,16** |
+| `large` |         100 129 |            100 129 |       **1,00** |
+
+C'est ce qui explique que `mixed` (92 ns/op) soit plus lent que `large` (84 après V1) alors
+qu'il ne fait que de petites allocations. Des bins par classe de taille ramèneraient les
+23 maillons à ~1 → **V2 est le plus gros gisement restant**.
+
+## Ordre recommandé
+1. **V1** — mesuré, −35 % sur `large`, trois lignes + mise à jour de `test_large_cache`.
+2. **V2** — le gros morceau, vise `mixed`.
+3. V4 puis M3/M2 selon l'envie ; V3 et V5 seulement si une mesure les justifie.

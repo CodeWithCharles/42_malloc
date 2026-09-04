@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/03 16:45:54 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 13:14:24 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 16:49:35 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,6 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #define SLOT_COUNT	512
 
@@ -33,6 +35,34 @@ static unsigned long	rng(void)
 	g_rng ^= g_rng >> 7;
 	g_rng ^= g_rng << 17;
 	return (g_rng);
+}
+
+static void	report_memory(void)
+{
+	char	buf[4096];
+	char	*found;
+	long	vmpeak;
+	long	vmhwm;
+	int	fd;
+	ssize_t	n;
+
+	vmpeak = 0;
+	vmhwm = 0;
+	fd = open("/proc/self/status", O_RDONLY);
+	if (fd < 0)
+		return ;
+	n = read(fd, buf, sizeof(buf) - 1);
+	close(fd);
+	if (n <= 0)
+		return ;
+	buf[n] = '\0';
+	found = strstr(buf, "VmPeak:");
+	if (found != NULL)
+		vmpeak = strtol(found + 7, NULL, 10);
+	found = strstr(buf, "VmHWM:");
+	if (found != NULL)
+		vmhwm = strtol(found + 6, NULL, 10);
+	printf("    VmPeak %8ld KB    VmHWM %8ld KB\n", vmpeak, vmhwm);
 }
 
 static size_t	pick_size_small(void)
@@ -108,6 +138,7 @@ static void	run_profile(size_t (*pick)(void), size_t ops, int with_realloc)
 	printf("\n    %10zu ops    %10.2f ns/op    %10.2f ms total\n",
 		ops, elapsed_ns(start, stop) / (double)ops,
 		elapsed_ns(start, stop) / 1e6);
+	report_memory();
 }
 
 static void	run_sawtooth(size_t ops)
@@ -134,6 +165,7 @@ static void	run_sawtooth(size_t ops)
 	printf("\n    %10zu ops    %10.2f ns/op    %10.2f ms total\n",
 		ops, elapsed_ns(start, stop) / (double)ops,
 		elapsed_ns(start, stop) / 1e6);
+	report_memory();
 }
 
 int	main(int argc, char **argv)

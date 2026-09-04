@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/03 15:00:07 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 15:04:16 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 15:37:59 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -46,7 +46,7 @@ static int	test_scribble(void)
 	ftm_debug()->scribble = true;
 	p = ftm_alloc(64);
 	ftm_release(p);
-	CHECK(p[0] == 0xDE && p[63] == 0xDE);
+	CHECK(p[16] == 0xDE && p[63] == 0xDE);
 	return (0);
 }
 

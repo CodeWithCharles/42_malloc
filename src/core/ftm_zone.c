@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:05:11 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 11:19:03 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 15:32:39 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -47,6 +47,7 @@ t_zone  *ftm_zone_create(t_zone_kind kind, size_t payload_size)
 	zone->prev = NULL;
 	zone->total_size = total_size;
 	zone->kind = kind;
+	zone->free_list = NULL;
 	block = ftm_zone_first_block(zone);
 	block->payload_size = total_size - FTM_ZONE_HEADER_SIZE
 		- FTM_BLOCK_HEADER_SIZE;
@@ -54,6 +55,7 @@ t_zone  *ftm_zone_create(t_zone_kind kind, size_t payload_size)
 	block->prev = NULL;
 	block->flags = FTM_BLOCK_MAGIC;
 	ftm_block_mark_free(block);
+	ftm_free_list_push(zone, block);
 	return (zone);
 }
 
@@ -64,14 +66,5 @@ void    ftm_zone_destroy(t_zone *zone)
 
 t_block *ftm_zone_find_free(t_zone *zone, size_t payload_size)
 {
-	t_block *block;
-	
-	block = ftm_zone_first_block(zone);
-	while (block != NULL)
-	{
-		if (ftm_block_is_free(block) && block->payload_size >= payload_size)
-			return (block);
-		block = block->next;
-	}
-	return (NULL);
+	return (ftm_free_list_find(zone, payload_size));
 }

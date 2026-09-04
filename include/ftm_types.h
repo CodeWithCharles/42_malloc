@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 12:37:40 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 13:07:59 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 15:20:14 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -57,10 +57,17 @@ typedef struct s_block
 	uintptr_t       flags;
 } t_block;
 
+typedef struct s_free_node
+{
+	t_block			*next_free;
+	t_block			*prev_free;
+} t_free_node;
+
 typedef struct s_zone
 {
 	struct s_zone   *next;
 	struct s_zone   *prev;
+	t_block			*free_list;
 	size_t          total_size;
 	t_zone_kind     kind;
 } t_zone;

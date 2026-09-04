@@ -475,3 +475,65 @@ Aucun thrashing. Le motif « allouer en masse puis tout libérer » est au contr
 donc l'allocation suivante trouve immédiatement. Le coût de l'implémentation (renommage de
 `ftm_large_cache.c`, trois listes, trois compteurs, retouche de `test_large_cache.c`) n'est
 pas justifié par un gain nul. Le profil `sawtooth` est conservé dans le bench comme témoin.
+
+## D33 — Free list explicite : ×3,1 sur `small`, ×2,1 sur `mixed` (2026-09-04)
+
+**Écart au plan.** `perf-roadmap.md` prévoyait une free list **globale par kind** dans
+`t_heap`. Retenu à la place : **une free list par zone** (`t_block *free_list` dans
+`t_zone`). Trois raisons, toutes vérifiées à l'écriture :
+1. **Sûreté** — quand une zone part au cache ou est détruite, sa liste meurt avec elle.
+   Aucun pointeur ne survit vers une zone non listée : le piège n°1 annoncé dans la
+   roadmap (bloc orphelin servi depuis une zone que la page map ne reconnaît plus)
+   disparaît par construction, il n'y a rien à délier dans `heap_release_zone_if_free`.
+2. **Simplicité** — tous les appelants de `split`/`coalesce_next` ont déjà la zone en
+   main, donc passage par paramètre plutôt qu'un état global de plus.
+3. **Même gain** — 2 zones × ~11 blocs libres = 22 maillons parcourus dans les deux
+   variantes, contre ~280 avant.
+
+Prix payé : `heap_reserve_block` continue d'itérer sur les zones pour TINY/SMALL
+(négligeable, 2 zones).
+
+**Les trois contrats** qui rendent le câblage mécanique :
+- un bloc libre d'une zone listée est **toujours** dans `zone->free_list` (donc
+  `ftm_free_list_find` ne teste plus `is_free`) ;
+- `ftm_block_split(zone, block, n)` suppose `block` **hors** liste, et y pousse le résidu ;
+- `ftm_block_coalesce_next(zone, block)` **délie elle-même** le voisin absorbé
+  (l'ordre compte : délier avant de modifier les tailles, sinon on manipule un nœud
+  logé dans un payload déjà absorbé).
+
+**Résultats (médianes, 3 runs)** :
+
+| profil  | glibc | avant | **après** | gain   | ratio vs glibc     |
+|---------|------:|------:|----------:|-------:|-------------------:|
+| `small` |  11.6 |  ~170 |    **55** | **×3,1** | ×4,7 (était ×14,7) |
+| `mixed` |  29.3 |  ~191 |    **91** | **×2,1** | ×3,1 (était ×6,5)  |
+| `large` |  55.6 |  ~230 |       216 | neutre | ×3,9               |
+
+`large` neutre : attendu, son chemin ne consulte aucune free list depuis le pas A (D29).
+
+**Changement de comportement observable** : `FT_MALLOC_SCRIBBLE` n'empoisonne plus les
+16 premiers octets d'un bloc libéré — ils portent le chaînage, écrit après le poison.
+`tests/test_debug.c` vérifie désormais à partir de l'offset 16. `tests/test_zone.c` a dû
+délier explicitement dans `test_find_free` : marquer un bloc utilisé sans le délier crée
+un état que le code de production ne produit jamais (« libre ⟺ chaîné »).
+
+## D34 — Invariant free list dans ftm_check_heap, et un trou de couverture révélé (2026-09-04)
+
+`check_zone` compte les blocs libres via le parcours **par adresse** (source de vérité) et
+`check_free_list` compare cette cardinalité à la longueur de la liste. Une seule
+comparaison détecte les trois défaillances : bloc jamais poussé (liste plus courte),
+bloc poussé deux fois ou jamais délié (plus longue), bloc alloué resté dans la liste
+(test `is_free`). La borne `seen <= expected` + `block == NULL` final détecte les
+**cycles** — sans elle, un `next_free` incohérent ferait boucler le test indéfiniment
+au lieu d'échouer.
+
+**Trou de couverture rencontré.** Première version livrée avec `check_free_list` écrite
+mais jamais appelée (`check_zone` avait gardé son ancien `return`) : 16/16 verts, fuzz
+200k, et **zéro vérification** de la structure qu'on venait d'écrire. Seul le warning
+`defined but not used` l'a signalé — et encore, uniquement dans le build des tests, car
+`ftm_check.c` est intégralement sous `#ifdef FTM_DEBUG` donc vide en release.
+
+**À faire** : ajouter `-Werror` aux `CFLAGS` de `tests/Makefile`. Le build des tests est
+aujourd'hui moins exigeant que celui de la `.so`, alors que c'est lui qui compile le code
+de vérification. Même esprit que D30 : ne pas laisser un signal faible passer pour un
+succès.

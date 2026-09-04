@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:38:11 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 13:21:23 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 15:34:57 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -62,9 +62,12 @@ static t_block	*heap_reserve_block(t_zone_kind kind, size_t payload_size)
 	zone = g_heap.zones[kind];
 	while (zone != NULL && kind != FTM_LARGE)
 	{
-		block =	ftm_zone_find_free(zone, payload_size);
+		block = ftm_zone_find_free(zone, payload_size);
 		if (block != NULL)
-			return (ftm_block_split(block, payload_size));
+		{
+			ftm_free_list_unlink(zone, block);
+			return (ftm_block_split(zone, block, payload_size));
+		}
 		zone = zone->next;
 	}
 	zone = heap_push_zone(kind, payload_size);
@@ -73,7 +76,8 @@ static t_block	*heap_reserve_block(t_zone_kind kind, size_t payload_size)
 	block = ftm_zone_find_free(zone, payload_size);
 	if (block == NULL)
 		return (NULL);
-	return (ftm_block_split(block, payload_size));
+	ftm_free_list_unlink(zone, block);
+	return (ftm_block_split(zone, block, payload_size));
 }
 
 void	*ftm_alloc(size_t size)
@@ -194,12 +198,10 @@ static void	release_block(t_zone *zone, t_block *block)
 {
 	ftm_on_free(block);
 	ftm_block_mark_free(block);
-	ftm_block_coalesce_next(block);
+	ftm_free_list_push(zone, block);
+	ftm_block_coalesce_next(zone, block);
 	if (block->prev != NULL && ftm_block_is_free(block->prev))
-	{
-		block = block->prev;
-		ftm_block_coalesce_next(block);
-	}
+		ftm_block_coalesce_next(zone, block->prev);
 	heap_release_zone_if_free(zone);
 }
 

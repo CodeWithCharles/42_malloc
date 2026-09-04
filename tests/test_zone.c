@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:11:56 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:36:48 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 15:37:27 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -62,6 +62,7 @@ static int	test_find_free(void)
 	CHECK(ftm_zone_find_free(zone, block->payload_size + 1) == NULL);
 
 	ftm_block_mark_used(block);
+	ftm_free_list_unlink(zone, block);
 	CHECK(ftm_zone_find_free(zone, 16) == NULL);
 
 	ftm_zone_destroy(zone);

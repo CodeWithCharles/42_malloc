@@ -6,21 +6,21 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 17:11:53 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 12:12:06 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 15:37:06 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ftm_internal.h"
 #include "ftm_port.h"
 
-static void	shrink_in_place(t_block *block, size_t new_payload)
+static void	shrink_in_place(t_zone *zone, t_block *block, size_t new_payload)
 {
-	ftm_block_split(block, new_payload);
+	ftm_block_split(zone, block, new_payload);
 	if (block->next != NULL)
-		ftm_block_coalesce_next(block->next);
+		ftm_block_coalesce_next(zone, block->next);
 }
 
-static bool	try_absorb_next(t_block *block, size_t new_payload)
+static bool	try_absorb_next(t_zone *zone, t_block *block, size_t new_payload)
 {
 	t_block	*next;
 
@@ -30,11 +30,12 @@ static bool	try_absorb_next(t_block *block, size_t new_payload)
 	if (block->payload_size + FTM_BLOCK_HEADER_SIZE
 		+ next->payload_size < new_payload)
 		return (false);
+	ftm_free_list_unlink(zone, next);
 	block->payload_size += FTM_BLOCK_HEADER_SIZE + next->payload_size;
 	block->next = next->next;
 	if (next->next != NULL)
 		next->next->prev = block;
-	ftm_block_split(block, new_payload);
+	ftm_block_split(zone, block, new_payload);
 	return (true);
 }
 
@@ -102,11 +103,11 @@ void	*ftm_resize(void *ptr, size_t size)
 	{
 		if (new_payload <= block->payload_size)
 		{
-			shrink_in_place(block, new_payload);
+			shrink_in_place(zone, block, new_payload);
 			block->request_size = size;
 			return (ptr);
 		}
-		if (try_absorb_next(block, new_payload))
+		if (try_absorb_next(zone, block, new_payload))
 		{
 			block->request_size = size;
 			return (ptr);

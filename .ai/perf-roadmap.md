@@ -206,7 +206,7 @@ taille utilisable est la sémantique de `malloc_usable_size(3)`, donc défendabl
 **À trancher avant de coder.** Sans objet si on fait l'étape 3 (les boundary tags
 suppriment le champ de toute façon).
 
-### 4.2 `MADV_DONTNEED` sur les zones en cache
+### 4.2 `MADV_DONTNEED` sur les zones en cache — ⏸ REPOUSSÉ (mesuré, cf. D36)
 Le cache retient jusqu'à 32 zones (~400 Ko de RSS jamais rendus). Un
 `madvise(zone, total_size, MADV_DONTNEED)` au moment du `put` libère les pages
 **physiques** en gardant le mapping virtuel : au `take`, pas de `mmap`, juste des défauts
@@ -218,8 +218,11 @@ defence »*. La justification est directe : on rend la mémoire sans perdre le c
 **À isoler dans `port/`** (D2) : `ftm_release_pages(void *addr, size_t length)` comme 11ᵉ
 fonction du contrat, no-op dans le fake port.
 
-**À mesurer.** Le gain mémoire est certain ; le coût en vitesse (défauts de page au
-réemploi) doit être mesuré sur le profil `large`.
+**Mesuré le 2026-09-04 (D36) — invalide en l'état.** Le taux de hit du cache est déjà de
+99,5 %, donc madviser toutes les zones convertirait des hits gratuits (0 ns) en hits à
+1 389 ns : régression ×6. Seul un cache à deux étages (chaud non-madvisé + froid madvisé)
+tiendrait, et son plafond mesuré est de 8 % de gain vitesse. Repoussé : c'est une
+optimisation mémoire, à rouvrir si le RSS devient un problème réel.
 
 ### 4.3 Redimensionner la page map
 `FTM_ZONE_MAP_CAPACITY` = 8192 entrées × 16 o = 128 Ko de BSS, pour indexer ~24 Mo de

@@ -537,3 +537,138 @@ mais jamais appelée (`check_zone` avait gardé son ancien `return`) : 16/16 ver
 aujourd'hui moins exigeant que celui de la `.so`, alors que c'est lui qui compile le code
 de vérification. Même esprit que D30 : ne pas laisser un signal faible passer pour un
 succès.
+
+## D35 — Re-tuning du cache LARGE après l'étape 2 : cap 32 → 64 (2026-09-04)
+
+**Hypothèse de départ (fausse).** Le `best-fit` linéaire de `ftm_large_cache_take` parcourt
+jusqu'à `MAX_ZONES` en-têtes situés sur des pages distinctes → un cache miss par maillon →
+un cap plus grand devrait *ralentir*. Le balayage montre l'inverse, de façon monotone.
+
+| cap  | ns/op | syscalls / 200k ops | mémoire retenue (pire cas) |
+|-----:|------:|--------------------:|---------------------------:|
+|    4 |  1311 |                   — |                     ~32 Ko |
+|    8 |   788 |                   — |                     ~64 Ko |
+|   16 |   441 |                   — |                    ~128 Ko |
+|   32 |   220 |                4923 |                    ~256 Ko |
+|**64**|**121**|                1061 |                    ~512 Ko |
+|  128 |   114 |                 581 |                      ~1 Mo |
+|  256 |   112 |                 453 |                      ~2 Mo |
+|  512 |   111 |                 368 |                      ~4 Mo |
+
+Ce n'est pas le coût du parcours qui domine mais le **taux de hit** : plus de zones en
+cache = moins de syscalls. Point d'inflexion à **64** (temps divisé par deux vs 32) ;
+au-delà on double la mémoire pour 6 %.
+
+**Décision : `FTM_LARGE_CACHE_MAX_ZONES` passe de 32 à 64.** Le cap est un plafond, pas une
+réservation : un programme qui ne libère jamais 64 zones LARGE n'en retient jamais 64,
+donc relever le défaut ne pénalise pas les petits programmes.
+
+**Leçon de méthode.** Le balayage de D28 (avant page map et free list) donnait 32 optimal
+et 64/128 *moins bons*. Les structures ayant rendu le CPU par opération bien moins cher,
+le poids relatif du syscall a augmenté et l'optimum s'est déplacé. **Un paramètre réglé se
+re-règle après chaque changement structurel** — il n'y a pas de valeur juste dans l'absolu.
+
+**Conséquence sur la suite.** L'étape 4.2 (`MADV_DONTNEED` sur les zones en cache) change
+de statut : ce n'est plus un confort mémoire, c'est ce qui permettrait de monter le cap
+bien au-delà de 64 sans en payer le RSS. À traiter en priorité.
+
+## D36 — `madvise` : mesuré AVANT implémentation, et repoussé (2026-09-04)
+
+Microbenchmark sur une zone de 8 Ko, 50 000 cycles :
+
+| régime                                        | ns/cycle |
+|-----------------------------------------------|---------:|
+| `mmap` + touch + `munmap` (notre cache miss)  |    6 678 |
+| `MADV_DONTNEED` + re-touch                    |    3 427 |
+| `MADV_FREE` + re-touch                        |    1 389 |
+| réutilisation pure (notre cache hit)          |    **0** |
+
+**Le point décisif : notre taux de hit est déjà de 99,5 %** (à cap=64 : ~530 `mmap` pour
+~100 000 allocations). Madviser toutes les zones du cache convertirait 99,5 % de hits
+**gratuits** en hits à 1 389 ns → ~700 ns/op au lieu de 116, soit une **régression ×6**.
+La piste telle que décrite dans `perf-roadmap.md` §4.2 est invalide.
+
+**Seul design viable : cache à deux étages** — chaud non-madvisé (hits gratuits) + froid
+madvisé remplaçant la destruction. Mais son plafond est connu et mesuré : `cap=512` sans
+madvise donne 111 ns/op contre 121 à cap=64, donc **le gain vitesse maximal est de 8 %**,
+au prix d'un cache à deux niveaux, d'une 11e fonction de port et d'un invariant de plus.
+
+**Décision : repoussé.** Ce n'est pas une optimisation de vitesse mais de mémoire — elle
+donnerait la performance d'un cache de 512 zones au coût RSS d'un cache de 64. Sans
+problème de RSS avéré (le cap est un plafond, pas une réservation), le rapport
+complexité/gain ne le justifie pas. À rouvrir si la mémoire retenue devient un sujet.
+
+**À retenir pour la soutenance** : `MADV_FREE` est 2,5× moins cher que `MADV_DONTNEED`
+(1 389 vs 3 427) parce qu'il est paresseux — le noyau ne récupère les pages que sous
+pression mémoire. C'est la primitive que privilégie jemalloc.
+
+## D37 — BUG : la page map se désactive irréversiblement sur charge longue (2026-09-04)
+
+Découvert en préparant l'étape 4.3 (réduction de `FTM_ZONE_MAP_CAPACITY`).
+
+**Symptôme.** Probe de 2 000 000 d'opérations LARGE, jeu de pages vivantes ~900 :
+
+| capacité | `zone_map_live` final | MAX_LIVE | map active ? |
+|---------:|----------------------:|---------:|:------------:|
+|     1024 |                   766 |      768 |  ❌ désactivée |
+|     2048 |                  1536 |     1536 |  ❌ désactivée |
+|     4096 |                  3072 |     3072 |  ❌ désactivée |
+|     8192 |                  4096 |     6144 |  ✅ active     |
+
+Une fois désactivée, `ftm_heap_find_zone` retombe **définitivement** sur le parcours
+linéaire O(n) : régression progressive, irréversible, et invisible sur un bench de
+200 000 opérations (d'où l'absence de falaise dans le balayage initial, qui ne montrait
+un effondrement qu'à 512/1024).
+
+**Cause.** `zone_map_live` compte les **cases vierges consommées** et n'est jamais
+décrémenté au retrait ; les pierres tombales ne sont jamais récupérées. Le compteur mesure
+donc l'usure cumulée de la table, pas sa charge réelle. Il atteint mécaniquement le seuil,
+quel que soit le nombre de pages réellement vivantes (900 ici).
+
+**L'étape 4.3 telle que planifiée aurait aggravé le bug** : passer la capacité à 2048 pour
+gagner 96 Ko de BSS aurait fait arriver la falaise 4× plus tôt. Optimisation annulée au
+profit du correctif.
+
+**Correctif retenu.**
+1. `zone_map_live` compte les entrées **réellement vivantes** : décrémenté dans
+   `map_remove_page`, incrémenté à l'insertion (y compris en réutilisant une tombstone).
+2. Nouveau compteur `zone_map_tombstones`.
+3. Quand `live + tombstones + pages > MAX_LIVE`, **reconstruction en place** : on vide la
+   table et on ré-insère toutes les zones depuis `heap->zones[kind]`. Aucun stockage
+   temporaire nécessaire — les listes de zones sont la source de vérité. O(pages), rare.
+4. `zone_map_disabled` ne se déclenche plus que si `live + pages > MAX_LIVE` **après**
+   reconstruction, c'est-à-dire uniquement s'il y a génuinement trop de pages vivantes.
+
+**Leçon.** Un compteur qui ne descend jamais n'est pas un indicateur de charge. Le bug
+était invisible aux 16 tests et au bench ; seul un probe long l'a exposé. À retenir pour
+la validation : les structures à état accumulé exigent un test de **durée**, pas seulement
+de correction.
+
+## D38 — Étape 4.3 : capacité de la page map 8192 → 4096 (2026-09-04)
+
+Après le correctif D37, balayage avec probe compilé à la même capacité que le code testé
+(le piège de la première mesure : `tests/Makefile` ne lit pas `CMOREFLAGS`, donc l'archive
+et le probe restaient à la capacité par défaut pendant que seule la `.so` variait).
+
+| capacité | BSS    | `zone_map_live` (2M ops) | active | marge |
+|---------:|-------:|-------------------------:|:------:|------:|
+|      512 |   8 Ko |                        — |   ❌   |     — |
+|     1024 |  16 Ko |                        — |   ❌   |     — |
+|     2048 |  32 Ko |                      690 |   ✅   | ×2,2  |
+| **4096** |**64 Ko**|                     690 |   ✅   | **×4,4** |
+|     8192 | 128 Ko |                      690 |   ✅   | ×8,9  |
+
+**Décision : `FTM_ZONE_MAP_CAPACITY` = 4096.** BSS divisée par deux (`sizeof(t_heap)`
+131 Ko → ~66 Ko), marge ×4,4 sur la charge observée, perf identique (120 vs 118 ns/op sur
+`large`, dans le bruit). 512 et 1024 se désactivent pour la bonne raison : leur MAX_LIVE
+(384, 768) est réellement inférieur au pic de pages vivantes.
+
+**Limitation connue, assumée.** `zone_map_disabled` reste **définitif** : une fois posé, on
+n'insère plus, donc aucune reconstruction n'a lieu et la map ne se rétablit jamais, même
+si la charge redescend. Un pic transitoire coûterait la map pour toute la vie du process.
+Le repli (parcours linéaire) reste **correct**, seulement plus lent. Le correctif serait
+simple dans son principe (`map_rebuild()` recalcule déjà `live` depuis les listes de zones,
+il suffirait de lever le drapeau si ça tient) mais la question du *quand* tenter la
+reconstruction ajoute de la machinerie. Avec une capacité dimensionnée à 4× la charge, le
+cas est jugé assez improbable pour être documenté plutôt que codé. À rouvrir si un profil
+réel le déclenche.

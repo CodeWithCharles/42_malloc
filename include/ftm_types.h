@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 12:37:40 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 15:20:14 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 16:13:09 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -83,8 +83,9 @@ typedef struct s_heap
 	t_zone  			*zones[FTM_ZONE_KIND_COUNT];
 	t_zone				*large_cache;
 	t_zone_map_entry	zone_map[FTM_ZONE_MAP_CAPACITY];
-	size_t				zone_map_live;
 	size_t				zone_count[FTM_ZONE_KIND_COUNT];
+	size_t				zone_map_live;
+	size_t				zone_map_tombstones;
 	size_t				large_cache_count;
 	size_t				large_cache_hits;
 	size_t  			map_calls;

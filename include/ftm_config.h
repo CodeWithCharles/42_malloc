@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 11:53:58 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 12:07:46 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 16:23:06 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,7 +28,7 @@
 /* --------------------------------- Caching -------------------------------- */
 
 # ifndef FTM_LARGE_CACHE_MAX_ZONES
-#  define FTM_LARGE_CACHE_MAX_ZONES		32
+#  define FTM_LARGE_CACHE_MAX_ZONES		64
 # endif
 # ifndef FTM_LARGE_CACHE_FIT_FACTOR
 #  define FTM_LARGE_CACHE_FIT_FACTOR	2
@@ -37,7 +37,7 @@
 /* --------------------------------- Mapping -------------------------------- */
 
 # ifndef FTM_ZONE_MAP_CAPACITY
-#  define FTM_ZONE_MAP_CAPACITY			8192
+#  define FTM_ZONE_MAP_CAPACITY			4096
 # endif
 # define FTM_ZONE_MAP_MAX_LIVE			(FTM_ZONE_MAP_CAPACITY / 4 * 3)
 # define FTM_ZONE_MAP_TOMBSTONE			((uintptr_t) - 1)

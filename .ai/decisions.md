@@ -788,3 +788,113 @@ Ratios face à la glibc : ×5,0 / ×3,2 / **×1,6**.
 `test_large_cache` documente désormais le nouvel invariant : une zone cachée **reste dans
 la map** (retrouvable en O(1) au retour) mais quitte `zones[kind]` et entre dans le cache.
 Le test exerce aussi le `free` d'un pointeur dont la zone est en cache.
+
+## D44 — V2 (free lists ségrégées) ANNULÉE : ×7 sur le parcours, 0 % sur le temps (2026-09-04)
+
+**Implémentée intégralement, mesurée, puis remisée** (`git stash`, récupérable).
+
+Les bins font exactement ce qu'on attendait d'eux sur la recherche :
+
+| profil  | maillons/appel avant | après | réduction |
+|---------|---------------------:|------:|----------:|
+| `small` |                 5,66 |  0,40 |       ×14 |
+| `mixed` |                23,16 |  3,25 |        ×7 |
+| `large` |                 1,00 |  0,49 |        ×2 |
+
+Et le temps n'a pas bougé — pire, il a régressé :
+
+| profil  | V1   | V2   | écart |
+|---------|-----:|-----:|-------|
+| `small` | 57,4 | 55,2 | −3,9 % (bruit) |
+| `mixed` | 92,9 | 93,5 | **+0,7 % — nul** |
+| `large` | 89,7 | 99,0 | **+10,3 %** |
+| VmPeak `large` | 5688 Ko | 5764 Ko | +76 Ko |
+
+**Le parcours de free list n'a jamais été le goulot.** L'estimation « ~1,5 ns par maillon »
+qui fondait la prévision de −38 % sur `mixed` (catalogue V2) était fausse : une zone TINY
+fait 20 Ko et tient en L1/L2, donc le processeur préfetche et spécule à travers 23 maillons
+pour un coût quasi nul. **Une réduction ×7 d'un parcours O(n) peut ne rien rapporter — la
+complexité algorithmique n'est pas le coût.**
+
+**Et V2 ajoute du travail sur les chemins chauds**, ce qui explique le −10 % sur `large` :
+`ftm_block_split` appelle désormais `ftm_free_list_release` (test des deux voisins) là où un
+`push` suffisait, et surtout `ftm_bin_index` est appelé au `push` **et** au `unlink`, sa
+partie logarithmique étant une boucle qui tourne 4-5 fois pour un payload LARGE. Optimiser
+`ftm_bin_index` avec `__builtin_clzl` ramènerait au mieux au niveau de V1, avec 240 octets
+de plus par en-tête de zone et un fichier bien plus complexe. Pour un gain nul.
+
+**Réserve honnête** : ces conclusions valent pour nos trois profils, où une zone porte
+~22 blocs libres. Un programme très fragmenté (des centaines de blocs libres par zone)
+pourrait rendre les bins rentables. On n'invente pas une charge pour justifier du code —
+mais le stash est là si une mesure future le demande.
+
+## D45 — LA libft ÉTAIT COMPILÉE EN -O0 : `calloc` ×26 (2026-09-04)
+
+Découvert en cherchant à quantifier V4 (`calloc` sans `memset` sur zone neuve). Un profil
+`calloc` ajouté au bench (mêmes tailles que `large`, pour comparaison directe) donne
+**5065 ns/op contre 90,6 pour `large`** — un facteur 56, très au-delà du coût d'un `memset`
+de 6 Ko.
+
+**Cause racine.** `thirdparty/libft/Makefile` : `CFLAGS := -Wall -Wextra -Werror -fPIC -g`.
+**Aucune optimisation.** Le désassemblage de `ft_memset.o` montre chaque variable rechargée
+depuis la pile à chaque itération d'une boucle octet-par-octet *descendante* (donc hostile
+au préfetcheur). Une bibliothèque de debug linkée dans une bibliothèque de production.
+
+Personne ne l'avait vu parce que les trois profils du bench n'appellent jamais `calloc` :
+`ft_memset` n'était sur aucun chemin chaud mesuré. `ft_memcpy` l'était (chemin `realloc`
+de `mixed`), mais son coût s'y noyait.
+
+**Quatre variantes mesurées :**
+
+| variante libft                              | calloc | large | mixed | small | symboles libc |
+|---------------------------------------------|-------:|------:|------:|------:|---------------|
+| `-O0` (état d'alors)                         |   5065 |  90,6 |  92,1 |  57,9 | aucun         |
+| `-O2`                                        |    151 |  82,0 |  77,7 |  54,9 | ⚠️ `memset`, `memcpy` |
+| `-O2 -fno-tree-loop-distribute-patterns`     |    845 |  80,2 |  76,3 |  53,0 | aucun         |
+| **`-O2` idem + `ft_memset`/`ft_memcpy` mot à mot** | **195** | **78,0** | **70,7** | **53,5** | **aucun** |
+
+**Le `-O2` seul est un piège** : la reconnaissance d'idiome de GCC convertit la boucle de
+`ft_memset` en **appel à `memset(3)`** (`nm -u` montre `U memset` et `U memcpy`). Or ni l'un
+ni l'autre n'est dans la liste des fonctions autorisées du sujet, et un correcteur qui fait
+`nm -D` sur la `.so` les verrait. D'où `-fno-tree-loop-distribute-patterns`, qui garde la
+boucle — au prix de la vectorisation, d'où les 845 ns.
+
+**Configuration retenue** : `-O2 -fno-strict-aliasing -fno-tree-loop-distribute-patterns`
+plus `ft_memset`/`ft_memcpy` réécrits **mot à mot** (`unsigned long` par pas de 8, reliquat
+octet par octet, sens ascendant). On récupère 96 % de la performance du SIMD de la glibc
+sans en emprunter une ligne.
+
+Note : `-fno-strict-aliasing` est nécessaire car `-O2` révèle une violation latente dans
+`src/ft_printf/printers/pointer_printer.c` (`n = *(long *)&ptr;`) que `-Werror` bloque.
+
+**Réserve** : la version mot à mot fait des accès non alignés (`*(unsigned long *)(out + i)`).
+Sans danger sur x86-64 et i386 ; sur une architecture à alignement strict il faudrait
+aligner la tête d'abord.
+
+**Décision en attente de Charles** : la libft est un sous-module partagé avec ses autres
+projets. Modifier son Makefile et ses deux fichiers les affecte tous (positivement, mais
+c'est son appel). Alternative : implémenter `ftm_memset`/`ftm_memcpy` optimisés dans
+`port/` et ne plus déléguer à la libft — local au projet, mais on perd l'argument
+« j'utilise ma libft ».
+
+**V4 (`calloc` sans `memset` sur zone neuve) devient sans objet** : avec un `memset` correct
+et un taux de hit de 99,5 % sur le cache LARGE, il ne se déclencherait que sur 0,5 % des
+allocations pour économiser ~100 ns. À classer sans suite.
+
+## D46 — État final après D45 (2026-09-04)
+
+Médianes sur 5 runs (`large` re-mesuré, un outlier à 136 écarté) :
+
+| profil   | début de session | final     | gain      | glibc | ratio |
+|----------|-----------------:|----------:|----------:|------:|------:|
+| `small`  |            176,3 |  **55,2** |    ×3,2   |  11,6 |  ×4,8 |
+| `mixed`  |            201,9 |  **70,2** |    ×2,9   |  29,3 |  ×2,4 |
+| `large`  |          3 119,9 |  **83,1** | **×37,5** |  55,6 |  ×1,5 |
+| `calloc` |          ~5 065  | **201,0** | **×25**   | 117,6 |  ×1,7 |
+
+`VmPeak` inchangé partout (2676 / 2656 / 5688 Ko). 16/16 tests.
+
+**Symboles non définis de la `.so`** (vérifiés `nm -D`) : `abort`, `__errno_location`,
+`getenv`, `getrlimit`, `mmap`, `munmap`, `pthread_mutex_lock/unlock`, `pthread_once`,
+`__register_atfork`, `sysconf`, `write`. Aucun `memset`/`memcpy`. Tout est soit dans la
+liste autorisée, soit justifiable au titre des bonus.

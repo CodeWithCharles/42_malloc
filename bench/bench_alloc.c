@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/03 16:45:54 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 16:49:35 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 17:37:26 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -168,6 +168,43 @@ static void	run_sawtooth(size_t ops)
 	report_memory();
 }
 
+static void	run_calloc(size_t ops)
+{
+	void			*slots[SLOT_COUNT];
+	struct timespec	start;
+	struct timespec	stop;
+	size_t			step;
+	size_t			idx;
+
+	memset(slots, 0, sizeof(slots));
+	clock_gettime(CLOCK_MONOTONIC, &start);
+	step = 0;
+	while (step < ops)
+	{
+		idx = rng() % SLOT_COUNT;
+		if (slots[idx] == NULL)
+			slots[idx] = calloc(1, pick_size_large());
+		else
+		{
+			free(slots[idx]);
+			slots[idx] = NULL;
+		}
+		step++;
+	}
+	clock_gettime(CLOCK_MONOTONIC, &stop);
+	idx = 0;
+	while (idx < SLOT_COUNT)
+	{
+		if (slots[idx] != NULL)
+			free(slots[idx]);
+		idx++;
+	}
+	printf("\n    %10zu ops    %10.2f ns/op    %10.2f ms total\n",
+		ops, elapsed_ns(start, stop) / (double)ops,
+		elapsed_ns(start, stop) / 1e6);
+	report_memory();
+}
+
 int	main(int argc, char **argv)
 {
 	size_t	ops;
@@ -185,6 +222,8 @@ int	main(int argc, char **argv)
 		run_profile(pick_size_mixed, ops, 1);
 	else if (strcmp(argv[1], "large") == 0)
 		run_profile(pick_size_large, ops, 0);
+	else if (strcmp(argv[1], "calloc") == 0)
+		run_calloc(ops);
 	else if (strcmp(argv[1], "sawtooth") == 0)
 		run_sawtooth(ops);
 	else

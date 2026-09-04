@@ -62,3 +62,27 @@ Fichiers ajoutés : `src/core/ftm_large_cache.c`, `src/core/ftm_zone_map.c`,
 2. Correctif structurel de `run_tests.sh` (cf. D30) : itérer sur les sources `test_*.c`
    et non sur les binaires de `build/`, pour qu'un test orphelin ne puisse plus passer.
 3. Relecture D14 du nouveau code (noms qui crient, zéro commentaire superflu).
+
+---
+
+## Bilan final de la session (2026-09-04)
+
+| profil   | début | fin       | gain      | glibc | ratio |
+|----------|------:|----------:|----------:|------:|------:|
+| `small`  | 176,3 |  **55,2** |    ×3,2   |  11,6 |  ×4,8 |
+| `mixed`  | 201,9 |  **70,2** |    ×2,9   |  29,3 |  ×2,4 |
+| `large`  | 3 120 |  **83,1** | **×37,5** |  55,6 |  ×1,5 |
+| `calloc` | ~5 065| **201,0** | **×25**   | 117,6 |  ×1,7 |
+
+16/16 tests (dont fuzz 200k avec vérification d'invariants à chaque opération).
+`VmPeak` inchangé. Aucun symbole libc interdit dans la `.so`.
+
+**Ce qui a payé** : cache de zones LARGE (D31), page map O(1) (D31), zones cachées
+conservées dans la map (D43), et surtout la libft recompilée en `-O2` avec
+`ft_memset`/`ft_memcpy` mot à mot (D45).
+
+**Ce qui a été annulé par la mesure** : cache TINY/SMALL (D32), `madvise` (D36),
+boundary tags (D39), free lists ségrégées (D44), `calloc` sans memset (D45).
+
+**Deux bugs latents trouvés en chemin** : test fantôme dans `run_tests.sh` (D30) et
+désactivation irréversible de la page map sur charge longue (D37).

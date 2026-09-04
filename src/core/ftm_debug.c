@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/03 14:51:58 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 15:21:02 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 13:08:40 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -56,7 +56,9 @@ static bool	canary_intact(t_block *block)
 
 void	ftm_on_alloc(t_block *block)
 {
-	ftm_history_record('A', ftm_block_payload(block), block->request_size);
+	if (g_debug.history)
+		ftm_history_record('A', ftm_block_payload(block),
+			block->request_size);
 	if (g_debug.perturb_on)
 		ftm_memset(ftm_block_payload(block), g_debug.perturb_byte,
 			block->request_size);
@@ -66,7 +68,9 @@ void	ftm_on_alloc(t_block *block)
 
 void	ftm_on_free(t_block *block)
 {
-	ftm_history_record('F', ftm_block_payload(block), block->payload_size);
+	if (g_debug.history)
+		ftm_history_record('F', ftm_block_payload(block),
+			block->payload_size);
 	if (g_debug.guard && !canary_intact(block))
 		ftm_report_error("ft_malloc: buffer overflow detected on free");
 	if (g_debug.scribble)

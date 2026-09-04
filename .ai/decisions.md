@@ -438,3 +438,40 @@ variable globale), zéro métadonnée allouée dynamiquement, et le cache *rédu
 de `munmap` — ce que le sujet demande explicitement. La garantie « no segv » est conservée
 (la map ne remplace pas la validation de pointeur, elle accélère seulement la localisation
 de la zone).
+
+## D32 — Étape 1 : compteur de zones, historique conditionnel, et cache TINY/SMALL ABANDONNÉ (2026-09-04)
+
+**Fait.**
+- `count_zones` (O(n) sur le chemin du `free`) remplacé par `size_t zone_count[]` dans
+  `t_heap`, maintenu au push et au release. Piège rencontré : le décrément doit être placé
+  **avant** le bloc `if (kind == FTM_LARGE)`, qui contient un `return` quand la zone part
+  au cache — sinon il est sauté dans le cas le plus fréquent. Attrapé par
+  `test_free_coalesce`.
+- `ftm_history_record` conditionné à un nouveau drapeau `t_debug.history`
+  (`FT_MALLOC_HISTORY`) : il tournait à chaque alloc et chaque free même quand
+  `show_alloc_mem_ex` n'était jamais appelé.
+- Bug latent corrigé dans `ftm_env.c` : `getenv(x) != NULL` testait la *présence*, donc
+  `FT_MALLOC_GUARD=0` **activait** le mode. Remplacé par un helper `env_flag` (valeur non
+  vide et différente de `"0"`).
+- `tests/test_show_ex.c` active désormais `history` : l'en-tête `--- history ---` étant
+  imprimé inconditionnellement, le test passait sans qu'aucune entrée ne soit enregistrée.
+
+**Effet mesuré** : neutre à cette échelle (`small` médiane 171 contre ~166 avant, dans le
+bruit). Ces gains portent sur quelques ns d'un budget de 170 — justes à faire, pas
+observables tant que le `first-fit` domine.
+
+**Cache TINY/SMALL : ABANDONNÉ, sur mesure.** Un profil `sawtooth` (300 allocs de 128 o
+puis 300 free, en boucle) a été ajouté au bench pour exhiber le thrashing de zones
+supposé. Résultat inverse de l'hypothèse :
+
+| profil     | glibc | ft_malloc | ratio |
+|------------|------:|----------:|------:|
+| `small`    |  11.6 |     ~170  | ×14,7 |
+| `sawtooth` |  10.4 |   **142.6** | **×13,7** |
+
+`strace` : 2030 syscalls pour 200 000 ops (1 %), même ordre que `large` après cache.
+Aucun thrashing. Le motif « allouer en masse puis tout libérer » est au contraire
+**favorable** au first-fit : après la vague de `free`, tout se recoalesce en gros blocs,
+donc l'allocation suivante trouve immédiatement. Le coût de l'implémentation (renommage de
+`ftm_large_cache.c`, trois listes, trois compteurs, retouche de `test_large_cache.c`) n'est
+pas justifié par un gain nul. Le profil `sawtooth` est conservé dans le bench comme témoin.

@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 16:13:10 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 17:09:17 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 13:17:07 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -34,21 +34,6 @@ static size_t	count_blocks(t_zone *zone)
 	{
 		total++;
 		block = block->next;
-	}
-	return (total);
-}
-
-static size_t	count_zones(t_zone_kind kind)
-{
-	t_zone	*zone;
-	size_t	total;
-
-	total = 0;
-	zone = ftm_heap_instance()->zones[kind];
-	while (zone != NULL)
-	{
-		total++;
-		zone = zone->next;
 	}
 	return (total);
 }
@@ -86,9 +71,9 @@ static int	test_large_is_unmapped(void)
 	void	*large;
 
 	large = ftm_alloc(5000);
-	CHECK(count_zones(FTM_LARGE) == 1);
+	CHECK(ftm_heap_instance()->zone_count[FTM_LARGE] == 1);
 	ftm_release(large);
-	CHECK(count_zones(FTM_LARGE) == 0);
+	CHECK(ftm_heap_instance()->zone_count[FTM_LARGE] == 0);
 	CHECK(ftm_check_heap());
 	return (0);
 }
@@ -101,11 +86,11 @@ static int	test_keep_one_tiny(void)
 	i = 0;
 	while (i < 200)
 		pointers[i++] = ftm_alloc(64);
-	CHECK(count_zones(FTM_TINY) == 2);
+	CHECK(ftm_heap_instance()->zone_count[FTM_TINY] == 2);
 	i = 0;
 	while (i < 200)
 		ftm_release(pointers[i++]);
-	CHECK(count_zones(FTM_TINY) == 1);
+	CHECK(ftm_heap_instance()->zone_count[FTM_TINY] == 1);
 	CHECK(ftm_check_heap());
 	return (0);
 }

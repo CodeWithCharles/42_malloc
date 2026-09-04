@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/03 16:45:54 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 17:01:20 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 13:14:24 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -110,6 +110,32 @@ static void	run_profile(size_t (*pick)(void), size_t ops, int with_realloc)
 		elapsed_ns(start, stop) / 1e6);
 }
 
+static void	run_sawtooth(size_t ops)
+{
+	void			*held[300];
+	struct timespec	start;
+	struct timespec	stop;
+	size_t			step;
+	size_t			index;
+
+	clock_gettime(CLOCK_MONOTONIC, &start);
+	step = 0;
+	while (step < ops)
+	{
+		index = 0;
+		while (index < 300)
+			held[index++] = malloc(128);
+		index = 0;
+		while (index < 300)
+			free(held[index++]);
+		step += 600;
+	}
+	clock_gettime(CLOCK_MONOTONIC, &stop);
+	printf("\n    %10zu ops    %10.2f ns/op    %10.2f ms total\n",
+		ops, elapsed_ns(start, stop) / (double)ops,
+		elapsed_ns(start, stop) / 1e6);
+}
+
 int	main(int argc, char **argv)
 {
 	size_t	ops;
@@ -127,6 +153,8 @@ int	main(int argc, char **argv)
 		run_profile(pick_size_mixed, ops, 1);
 	else if (strcmp(argv[1], "large") == 0)
 		run_profile(pick_size_large, ops, 0);
+	else if (strcmp(argv[1], "sawtooth") == 0)
+		run_sawtooth(ops);
 	else
 	{
 		fprintf(stderr, "unknown profile: %s\n", argv[1]);

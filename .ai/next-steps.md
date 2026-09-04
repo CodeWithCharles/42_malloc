@@ -29,6 +29,19 @@ les `munmap` — explicitement demandé par le sujet.
 - **Un test qui passait sans source** (D30) : binaire orphelin d'une autre branche resté
   dans `build/`. Trouvé en vérifiant, pas en faisant confiance au compteur de tests.
 
+## Suite : optimisation continue
+Deux documents dédiés, écrits le 2026-09-04 :
+- **`perf-roadmap.md`** — pistes CONFORMES au sujet, à implémenter (c'est le plan de
+  travail : free list explicite, boundary tags, réglages mémoire, madvise). Ordre
+  recommandé et protocole de validation inclus.
+- **`perf-hors-sujet.md`** — pistes qui cassent le sujet (tcache, arènes multiples, brk,
+  free non validé). Non implémentables pour le rendu ; sert d'argumentaire de soutenance
+  et de porte ouverte pour KFS-3.
+
+Diagnostic mesuré qui pilote la suite : une zone TINY porte ~140 blocs dont 8 % libres,
+donc le `first-fit` linéaire consomme à lui seul les ~200 ns/op de `small` et `mixed`.
+Le verrou, lui, ne coûte que 4,1 ns (2 %) — ce n'est pas le goulot.
+
 ## Post-soutenance éventuel
 - KFS-3 : le port kernel (cf. roadmap §8). La page map est littéralement une table
   inversée page→zone : bon entraînement avant la pagination de KFS-3.

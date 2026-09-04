@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:46:29 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 15:51:45 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 13:16:38 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,21 +24,6 @@
 } while (0)
 
 #define TINY_COUNT	200
-
-static size_t	count_zones(t_zone_kind kind)
-{
-	t_zone	*zone;
-	size_t	total;
-
-	total = 0;
-	zone = ftm_heap_instance()->zones[kind];
-	while (zone != NULL)
-	{
-		total++;
-		zone = zone->next;
-	}
-	return (total);
-}
 
 static int	test_many_tiny(void)
 {
@@ -67,7 +52,7 @@ static int	test_many_tiny(void)
 		}
 		i++;
 	}
-	CHECK(count_zones(FTM_TINY) == 2);
+	CHECK(ftm_heap_instance()->zone_count[FTM_TINY] == 2);
 	return (0);
 }
 
@@ -79,7 +64,7 @@ static int	test_routing(void)
 	small = ftm_alloc(512);
 	large = ftm_alloc(5000);
 	CHECK(small != NULL && large != NULL);
-	CHECK(count_zones(FTM_LARGE) == 1);
+	CHECK(ftm_heap_instance()->zone_count[FTM_LARGE] == 1);
 	return (0);
 }
 

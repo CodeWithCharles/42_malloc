@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:38:11 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 12:34:18 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 13:21:23 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,6 +39,7 @@ static t_zone	*heap_push_zone(t_zone_kind kind, size_t payload_size)
 	if (g_heap.zones[kind] != NULL)
 		g_heap.zones[kind]->prev = zone;
 	g_heap.zones[kind] = zone;
+	g_heap.zone_count[kind]++;
 	ftm_zone_map_insert(zone);
 	return (zone);
 }
@@ -118,6 +119,7 @@ void	ftm_heap_reset(void)
 			zone = next;
 		}
 		g_heap.zones[kind] = NULL;
+		g_heap.zone_count[kind] = 0;
 		kind++;
 	}
 	ftm_large_cache_flush();
@@ -161,28 +163,13 @@ static bool	zone_is_fully_free(t_zone *zone)
 	return (ftm_block_is_free(first) && first->next == NULL);
 }
 
-static size_t	count_zones(t_zone_kind kind)
-{
-	t_zone	*zone;
-	size_t	total;
-
-	total = 0;
-	zone = g_heap.zones[kind];
-	while (zone != NULL)
-	{
-		total++;
-		zone = zone->next;
-	}
-	return (total);
-}
-
 static void	heap_release_zone_if_free(t_zone *zone)
 {
 	t_zone	*evicted;
 
 	if (!zone_is_fully_free(zone))
 		return ;
-	if (zone->kind != FTM_LARGE && count_zones(zone->kind) <= 1)
+	if (zone->kind != FTM_LARGE && g_heap.zone_count[zone->kind] <= 1)
 		return ;
 	if (zone->prev != NULL)
 		zone->prev->next = zone->next;
@@ -190,6 +177,7 @@ static void	heap_release_zone_if_free(t_zone *zone)
 		g_heap.zones[zone->kind] = zone->next;
 	if (zone->next != NULL)
 		zone->next->prev = zone->prev;
+	g_heap.zone_count[zone->kind]--;
 	ftm_zone_map_remove(zone);
 	if (zone->kind == FTM_LARGE)
 	{

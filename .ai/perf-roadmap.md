@@ -60,7 +60,7 @@ conditionner l'appel dans `ftm_debug.c`.
 active le drapeau via `ftm_debug()->history = true`, soit il accepte une section vide.
 À trancher au moment de l'implémentation.
 
-### 1.3 Étendre le cache de zones à TINY/SMALL
+### 1.3 Étendre le cache de zones à TINY/SMALL — ❌ ABANDONNÉ (mesuré, cf. D32)
 Aujourd'hui seules les zones LARGE sont mises en cache ; une zone TINY/SMALL
 surnuméraire est `munmap`ée immédiatement. Une charge qui oscille autour d'une frontière
 de zone refait donc un syscall à chaque oscillation.
@@ -70,8 +70,12 @@ de zone refait donc un syscall à chaque oscillation.
 plus de la taille. Recommandation : **un cache par kind**, c'est plus simple à raisonner
 et le `fit factor` n'a pas le même sens pour des zones TINY (toutes de taille identique).
 
-**Gain attendu.** Nul sur les benchs actuels (leurs zones restent stables), mais protège
-contre un pire cas réel. À mesurer avec un profil dédié « oscillation ».
+**Verdict mesuré (2026-09-04).** Un profil `sawtooth` (300 allocs puis 300 free en boucle)
+a été ajouté au bench pour exhiber le thrashing supposé : ft_malloc y fait **142,6 ns/op**,
+donc *mieux* que sur `small` (~170), avec seulement 2030 syscalls pour 200 000 ops (1 %).
+Aucun thrashing. Le motif est au contraire favorable au first-fit (tout se recoalesce
+après la vague de free). **Piste abandonnée** : coût réel, gain nul. Profil `sawtooth`
+conservé comme témoin.
 
 **Validation étape 1.** 16/16 tests, 3 profils inchangés ou légèrement meilleurs.
 
@@ -239,7 +243,7 @@ mondes », et c'est la plus grosse pièce de cette étape.
 ## Ordre recommandé
 
 ```
-Étape 1 (gains gratuits)   → mesurer
+Étape 1 (1.1 + 1.2 faits, 1.3 abandonné sur mesure — D32)
 Étape 2 (free list)        → mesurer          ← le gros gain vitesse
 Étape 4.3 + 4.4 (réglages) → mesurer          ← quasi gratuit
 Étape 4.2 (madvise)        → mesurer

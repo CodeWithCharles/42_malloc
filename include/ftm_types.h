@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 12:37:40 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 12:34:37 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 13:07:59 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,6 +24,7 @@ typedef struct s_debug
 	bool			perturb_on;
 	bool			guard;
 	bool			abort_on_error;
+	bool			history;
 	unsigned char	perturb_byte;
 	size_t			error_count;
 } t_debug;
@@ -76,11 +77,12 @@ typedef struct s_heap
 	t_zone				*large_cache;
 	t_zone_map_entry	zone_map[FTM_ZONE_MAP_CAPACITY];
 	size_t				zone_map_live;
-	bool				zone_map_disabled;
+	size_t				zone_count[FTM_ZONE_KIND_COUNT];
 	size_t				large_cache_count;
 	size_t				large_cache_hits;
 	size_t  			map_calls;
 	size_t  			unmap_calls;
+	bool				zone_map_disabled;
 	bool    			is_initialized;
 } t_heap;
 

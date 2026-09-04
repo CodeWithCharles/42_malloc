@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/03 15:23:20 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 15:23:20 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 13:11:46 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,6 +31,7 @@ int	main(void)
 	ftm_heap_reset();
 	fake_port_reset();
 	fake_capture_reset();
+	ftm_debug()->history = true;
 
 	p = ftm_alloc(20);
 	strcpy(p, "hello");

@@ -13,3 +13,7 @@ bench_alloc
 # editeur
 .cache/
 compile_commands.json
+
+# other
+.ai/
+CLAUDE.md

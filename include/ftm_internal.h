@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 14:36:57 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 15:40:43 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 18:05:25 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -59,6 +59,24 @@ void			ftm_block_coalesce_next(
 	t_block *block);
 
 bool			ftm_block_is_valid(const t_block *block);
+
+/* -------------------------------------------------------------------------- */
+/*                       Static inlines for optimization                      */
+/* -------------------------------------------------------------------------- */
+
+static inline size_t	ftm_block_request(const t_block *block)
+{
+	return (block->payload_size - (size_t)(block->flags >> FTM_DELTA_SHIFT));
+}
+
+static inline void	ftm_block_set_request(t_block *block, size_t request)
+{
+	uintptr_t	delta;
+
+	delta = (uintptr_t)(block->payload_size - request);
+	block->flags &= (((uintptr_t)1 << FTM_DELTA_SHIFT) - 1);
+	block->flags |= delta << FTM_DELTA_SHIFT;
+}
 
 /* ---------------------------------- Zones --------------------------------- */
 

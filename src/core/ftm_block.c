@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 15:31:28 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 15:31:30 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 17:51:02 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -51,5 +51,5 @@ void	ftm_block_coalesce_next(t_zone *zone, t_block *block)
 
 bool	ftm_block_is_valid(const t_block *block)
 {
-	return ((block->flags & ~FTM_STATE_MASK) == FTM_BLOCK_MAGIC);
+	return ((block->flags & FTM_MAGIC_MASK) == FTM_BLOCK_MAGIC);
 }

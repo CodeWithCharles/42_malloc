@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 17:55:49 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/03 15:22:19 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 17:52:50 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,7 +28,7 @@ static void	print_hex_preview(t_block *block)
 	size_t				n;
 
 	p = ftm_block_payload(block);
-	n = block->request_size;
+	n = ftm_block_request(block);
 	if (n > 64)
 		n = 64;
 	i = 0;
@@ -76,19 +76,21 @@ static void	print_block(t_block *block, size_t *total)
 	char		line[128];
 	size_t		pos;
 	uintptr_t	start;
+	size_t		request_size;
 
+	request_size = ftm_block_request(block);
 	start = (uintptr_t)ftm_block_payload(block);
 	pos = append(line, 0, "0x");
 	pos += ftm_fmt_hex(line + pos, start);
 	pos = append(line, pos, " - 0x");
-	pos += ftm_fmt_hex(line + pos, start + block->request_size);
+	pos += ftm_fmt_hex(line + pos, start + request_size);
 	pos = append(line, pos, " : ");
-	pos += ftm_fmt_udec(line + pos, block->request_size);
+	pos += ftm_fmt_udec(line + pos, request_size);
 	pos = append(line, pos, " bytes\n");
 	ftm_write(line, pos);
 	if (g_extended)
 		print_hex_preview(block);
-	*total += block->request_size;
+	*total += request_size;
 }
 
 static void	print_zone_header(const char *label, t_zone *zone)

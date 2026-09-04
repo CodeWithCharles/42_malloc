@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 12:37:40 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 16:13:09 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 17:50:06 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,18 +44,19 @@ typedef enum e_zone_kind
 # define FTM_BLOCK_FREE		((uintptr_t)0x01)
 # define FTM_BLOCK_CANARY	((uintptr_t)0x02)
 # define FTM_STATE_MASK		((uintptr_t)0xFF)
+# define FTM_MAGIC_MASK		((uintptr_t)0xFFFFFF00)
 # define FTM_BLOCK_MAGIC	((uintptr_t)0x4D464C00)
+# define FTM_DELTA_SHIFT	32
 
 /* --------------------------------- Structs -------------------------------- */
 
 typedef struct s_block
 {
-	size_t          payload_size;
-	size_t			request_size;
-	struct s_block  *next;
-	struct s_block  *prev;
-	uintptr_t       flags;
-} t_block;
+	size_t			payload_size;
+	struct s_block	*next;
+	struct s_block	*prev;
+	uintptr_t		flags;
+}	t_block;
 
 typedef struct s_free_node
 {
@@ -117,5 +118,7 @@ _Static_assert(FTM_ZONE_HEADER_SIZE % FTM_ALIGNMENT == 0,
 	"zone header size must be a multiple of alignment");
 _Static_assert((FTM_ZONE_MAP_CAPACITY & (FTM_ZONE_MAP_CAPACITY - 1)) == 0,
 	"zone map capacity must be a power of two");
+_Static_assert(sizeof(uintptr_t) >= 8,
+	"request delta packing needs 64-bit flags");
 
 #endif

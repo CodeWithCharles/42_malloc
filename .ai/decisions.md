@@ -898,3 +898,101 @@ Médianes sur 5 runs (`large` re-mesuré, un outlier à 136 écarté) :
 `getenv`, `getrlimit`, `mmap`, `munmap`, `pthread_mutex_lock/unlock`, `pthread_once`,
 `__register_atfork`, `sysconf`, `write`. Aucun `memset`/`memcpy`. Tout est soit dans la
 liste autorisée, soit justifiable au titre des bonus.
+
+## D47 — M1 fait : en-tête 48 → 32, mais les accesseurs DOIVENT être `static inline` (2026-09-04)
+
+`request_size` supprimé de `t_block` ; la taille demandée est reconstituée depuis le
+**delta** `payload_size − request` rangé dans les bits 32-63 de `flags` (état sur 0-7,
+magic sur 8-31, cf. D42). `ftm_block_is_valid` masque désormais explicitement
+`FTM_MAGIC_MASK = 0xFFFFFF00` au lieu de `~FTM_STATE_MASK`.
+
+Résultat : `sizeof(t_block)` 40 → 32, en-tête **48 → 32**, zone TINY **5 → 4 pages**
+(−20 %), densité 23,2 → 25,5 allocations par page (+10 %), zone SMALL 52 → 51 pages.
+102 allocations par zone TINY, toujours ≥ 100. **Et `show_alloc_mem` affiche toujours la
+taille demandée exacte.**
+
+**Piège majeur rencontré.** Première version avec les accesseurs définis dans
+`ftm_align.c` : **régression de 16 à 39 % sur les quatre profils.**
+
+| profil   | avant M1 | accesseurs = fonctions | accesseurs `static inline` |
+|----------|---------:|-----------------------:|---------------------------:|
+| `small`  |     55,2 |                   63,9 |                   **57,4** |
+| `mixed`  |     70,2 |                   84,9 |                   **72,6** |
+| `large`  |     83,1 |                  103,4 |                   **83,7** |
+| `calloc` |    201,0 |                  278,9 |                  **195,2** |
+
+Ce n'est **pas** le coût de l'appel (un appel ne vaut pas 78 ns) mais la **barrière
+d'optimisation** : un appel vers une autre unité de compilation force GCC à supposer que
+la fonction peut modifier n'importe quelle mémoire, donc il recharge tout autour du site,
+spille des registres et abandonne ses hypothèses. Remplacer un accès à un champ par un
+appel opaque, sur un chemin exécuté à chaque `malloc`, coûte bien plus que l'appel.
+
+**Correctif** : les deux accesseurs passent en `static inline` dans `ftm_internal.h`. Le
+sujet dispensant de la Norme (« clean code even without norm »), c'est légitime et c'est
+l'idiome C standard. M1 devient alors neutre en vitesse (+3-4 % sur `small`/`mixed`, dans
+la bimodalité mesurée en D41) pour un gain mémoire réel.
+
+**Limite de portabilité assumée** : le packing suppose `sizeof(uintptr_t) >= 8`
+(`_Static_assert` ajouté). Sur i386, `flags >> 32` serait un comportement indéfini ; il
+faudrait déplacer le delta en bits 8-15 — il tient dans 8 bits, ne dépassant jamais 94 —
+et resserrer le magic sur 16-31. Seul endroit du projet qui suppose des pointeurs 64 bits.
+
+### D47 (suite) — chiffres finaux de M1, mesurés au propre
+
+Première série polluée (load average ~0,7, VS Code + Firefox actifs) : dispersion de 106 à
+249 ns/op sur `large`. **Leçon de protocole : vérifier `uptime` avant une campagne de
+mesure.** Re-mesure sur 7 runs, machine calme :
+
+| profil   | avant M1 | après M1 | écart   | VmPeak            |
+|----------|---------:|---------:|---------|-------------------|
+| `small`  |     55,2 |     59,0 | +6,9 %  | 2676 → **2664** Ko |
+| `mixed`  |     70,2 |     71,7 | +2,1 %  | 2656 → **2648** Ko |
+| `large`  |     83,1 |     86,9 | +4,6 %  | 5688 → **5680** Ko |
+| `calloc` |    201,0 |    197,5 | −1,7 %  | 5688 → **5680** Ko |
+
+**Arbitrage assumé : ~4 % de vitesse contre 20 % de mémoire sur les zones TINY.**
+Le surcoût vient du décalage/masque/OU de `ftm_block_set_request` à chaque allocation, là
+où l'ancien code faisait un simple store — 1 à 2 ns sur un budget de 55.
+
+Le gain mémoire n'apparaît qu'à 8-12 Ko dans le bench parce qu'il ne maintient que deux ou
+trois zones vivantes. Le vrai gain est structurel et invisible ici : zone TINY 5 → 4 pages,
+densité 23,2 → 25,5 allocations par page. Un programme allouant beaucoup de petits objets
+mappe 20 % de mémoire en moins. **Le bench mesure mal l'empreinte** — c'est une limite à
+connaître, pas un argument contre M1.
+
+**Décision : M1 conservé.** `test_show` et `test_show_ex` passent, donc la fidélité de
+l'affichage de la taille demandée est préservée — c'était la condition de Charles.
+
+## D48 — M3 (`FIT_FACTOR`) : impasse dans les deux sens, on garde 2 (2026-09-04)
+
+**Facteur plus serré (3/2 = 1,5)** : `large` 86,9 → 114,2 (**+31 %**), `calloc` 197,5 →
+220,0 (+11 %), pour **80 Ko** de `VmPeak` économisés. `strace` : 1687 syscalls contre 1061,
+soit **+59 %** — un critère de réutilisation plus strict rejette davantage de zones du
+cache. `calloc` souffre doublement : chaque miss donne une zone fraîchement mappée dont le
+`memset` doit fauter toutes les pages.
+
+**Facteur plus large (3)** : comparaison entrelacée (3, 2, 3, 2) sur 7 runs pour neutraliser
+la dérive machine — `large` médianes 93,9 / **85,8** / 120,8 / **81,8**, VmPeak 5948 contre
+5680 Ko. Le facteur 2 gagne sur la vitesse **et** la mémoire, et il est bien plus stable
+(80-94 contre 81-166). Contre-intuitif mais explicable : une zone de 12 Ko servie à une
+demande de 4 Ko est consommée pour rien, ses 8 Ko restants gaspillés, et elle n'est plus
+disponible pour la grosse demande suivante. Un cache trop permissif se dégrade en retenant
+des zones mal appariées.
+
+**Décision : `FIT_FACTOR` reste à 2.** Le réglage d'origine était déjà optimal.
+
+**Deux acquis conservés malgré l'annulation :**
+1. Le facteur s'exprime désormais en **fraction entière** (`FIT_NUM`/`FIT_DEN`). La
+   tentative à 1,5 avait introduit un littéral **flottant** sur le chemin chaud :
+   `needed * 1.5` déclenchait entier → double, multiplication FP, reconversion tronquée à
+   chaque allocation LARGE, et `SIZE_MAX / 1.5` rendait le garde-fou d'overflow approximatif
+   (`SIZE_MAX` ne tient pas exactement dans un `double`). Coût mesuré : `calloc` 292 → 220
+   à comportement identique. La fraction rend ce piège impossible.
+2. **Garde `[ -f libft_malloc.so ]` avant toute campagne de mesure.** Un build échoué rend
+   `LD_PRELOAD` inopérant avec un simple avertissement, et on mesure la glibc sans le voir
+   (constaté : `large` à 49 ns, `VmPeak` 4368 Ko). Même mode de défaillance que le test
+   fantôme de [[D30]].
+
+**Note de protocole** : `zsh` ne découpe pas les variables non quotées (`set -- $f` avec
+`f="2 1"` donne `$1="2 1"`). Utiliser `${=f}` ou éviter les paires. Déjà rencontré en début
+de session sur la boucle `LD_PRELOAD`.

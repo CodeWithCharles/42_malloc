@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/04 11:29:48 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/04 11:36:52 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 18:05:24 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -42,9 +42,9 @@ static t_zone	*cache_pop_oldest(void)
 
 static size_t	fit_limit(size_t needed)
 {
-	if (needed > SIZE_MAX / FTM_LARGE_CACHE_FIT_FACTOR)
+	if (needed > SIZE_MAX / FTM_LARGE_CACHE_FIT_NUM)
 		return (SIZE_MAX);
-	return (needed * FTM_LARGE_CACHE_FIT_FACTOR);
+	return (needed * FTM_LARGE_CACHE_FIT_NUM / FTM_LARGE_CACHE_FIT_DEN);
 }
 
 t_zone	*ftm_large_cache_take(size_t payload_size)

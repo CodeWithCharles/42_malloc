@@ -6,7 +6,7 @@
 /*   By: cpoulain <cpoulain@student.42lehavre.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/02 18:11:59 by cpoulain          #+#    #+#             */
-/*   Updated: 2026/09/02 18:14:10 by cpoulain         ###   ########.fr       */
+/*   Updated: 2026/09/04 17:53:30 by cpoulain         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,11 +41,11 @@ static void	block_line(char *dst, void *ptr)
 	dst[pos++] = ' ';
 	dst[pos++] = '0';
 	dst[pos++] = 'x';
-	pos += ftm_fmt_hex(dst + pos, start + block->request_size);
+	pos += ftm_fmt_hex(dst + pos, start + ftm_block_request(block));
 	dst[pos++] = ' ';
 	dst[pos++] = ':';
 	dst[pos++] = ' ';
-	pos += ftm_fmt_udec(dst + pos, block->request_size);
+	pos += ftm_fmt_udec(dst + pos, ftm_block_request(block));
 	dst[pos] = '\0';
 }
 

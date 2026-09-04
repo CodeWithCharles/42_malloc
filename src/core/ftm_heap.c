@@ -27,7 +27,7 @@ static t_zone	*heap_push_zone(t_zone_kind kind, size_t payload_size)
 
 	zone = NULL;
 	if (kind == FTM_LARGE)
-		zone = ftm_large_cache_take(payload_size);
+		zone = FTM_CACHE_TAKE(payload_size);
 	from_cache = (zone != NULL);
 	if (zone == NULL)
 	{
@@ -43,7 +43,7 @@ static t_zone	*heap_push_zone(t_zone_kind kind, size_t payload_size)
 	g_heap.zones[kind] = zone;
 	g_heap.zone_count[kind]++;
 	if (!from_cache)
-		ftm_zone_map_insert(zone);
+		FTM_MAP_INSERT(zone);
 	return (zone);
 }
 
@@ -63,7 +63,7 @@ static t_block	*heap_reserve_block(t_zone_kind kind, size_t payload_size)
 	t_block	*block;
 
 	zone = g_heap.zones[kind];
-	while (zone != NULL && kind != FTM_LARGE)
+	while (zone != NULL && FTM_SCANS_ZONES(kind))
 	{
 		block = ftm_zone_find_free(zone, payload_size);
 		if (block != NULL)
@@ -143,7 +143,7 @@ t_zone	*ftm_heap_find_zone(void *ptr)
 	unsigned char	*address;
 	int				kind;
 
-	if (ftm_zone_map_is_active())
+	if (FTM_MAP_ACTIVE())
 		return (ftm_zone_map_lookup(ptr));
 	address = ptr;
 	kind = 0;
@@ -187,12 +187,12 @@ static void	heap_release_zone_if_free(t_zone *zone)
 	g_heap.zone_count[zone->kind]--;
 	if (zone->kind == FTM_LARGE)
 	{
-		evicted = ftm_large_cache_put(zone);
+		evicted = FTM_CACHE_PUT(zone);
 		if (evicted == NULL)
 			return ;
 		zone = evicted;
 	}
-	ftm_zone_map_remove(zone);
+	FTM_MAP_REMOVE(zone);
 	ftm_zone_destroy(zone);
 	g_heap.unmap_calls++;
 }

@@ -123,7 +123,21 @@ raisonnable — d'autant que le sujet en fait une exigence explicite. Cf. D39.
 
 ---
 
-## 6. Pour KFS-3
+## 6. Réutiliser les résidus des zones LARGE (M2) — pertinent seulement en 32 bits
+
+Mesuré le 2026-09-04 (D49) : 37,8 % de l'empreinte LARGE part en résidus de page
+(958 Ko sur 2,5 Mo), mais ces octets ne sont **jamais touchés**, donc jamais résidents
+(`VmPeak` 5680 Ko contre `VmHWM` 4480 Ko). Sur 64 bits, c'est de l'espace d'adressage
+virtuel — gratuit. Les récupérer coûterait le cache de zones, qui vaut ×37 sur ce profil.
+
+**En revanche, sur i386 (KFS-3)**, un mégaoctet d'espace d'adressage sur 4 Go n'est plus
+négligeable, et il n'y a pas de cache de zones à préserver puisque l'allocateur de frames
+joue ce rôle. L'arbitrage s'inverse : indexer les zones partiellement libres redeviendrait
+pertinent. À rouvrir dans ce contexte, pas avant.
+
+---
+
+## 7. Pour KFS-3
 
 Aucune de ces contraintes ne s'applique dans un kernel :
 - un `kfree` sur pointeur invalide qui déclenche un `kernel_panic` est le comportement

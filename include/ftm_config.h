@@ -52,4 +52,40 @@
 # define FTM_ZONE_SIZE(max_alloc, page_size, block_hdr, zone_hdr) \
 	FTM_ALIGN_UP((zone_hdr) + FTM_MIN_ALLOCS * ((block_hdr) + (max_alloc)), (page_size))
 
+/* ------------------------------ Ablation ---------------------------------- */
+
+# ifndef FTM_ENABLE_LARGE_CACHE
+#  define FTM_ENABLE_LARGE_CACHE		1
+# endif
+# ifndef FTM_ENABLE_ZONE_MAP
+#  define FTM_ENABLE_ZONE_MAP			1
+# endif
+# ifndef FTM_ENABLE_LARGE_FASTPATH
+#  define FTM_ENABLE_LARGE_FASTPATH		1
+# endif
+
+# if FTM_ENABLE_LARGE_CACHE
+#  define FTM_CACHE_TAKE(size)			ftm_large_cache_take(size)
+#  define FTM_CACHE_PUT(zone)			ftm_large_cache_put(zone)
+# else
+#  define FTM_CACHE_TAKE(size)			(NULL)
+#  define FTM_CACHE_PUT(zone)			(zone)
+# endif
+
+# if FTM_ENABLE_ZONE_MAP
+#  define FTM_MAP_INSERT(zone)			ftm_zone_map_insert(zone)
+#  define FTM_MAP_REMOVE(zone)			ftm_zone_map_remove(zone)
+#  define FTM_MAP_ACTIVE()			ftm_zone_map_is_active()
+# else
+#  define FTM_MAP_INSERT(zone)			((void)(zone))
+#  define FTM_MAP_REMOVE(zone)			((void)(zone))
+#  define FTM_MAP_ACTIVE()			(0)
+# endif
+
+# if FTM_ENABLE_LARGE_FASTPATH
+#  define FTM_SCANS_ZONES(kind)			((kind) != FTM_LARGE)
+# else
+#  define FTM_SCANS_ZONES(kind)			(1)
+# endif
+
 #endif

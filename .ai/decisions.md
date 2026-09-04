@@ -996,3 +996,117 @@ des zones mal appariées.
 **Note de protocole** : `zsh` ne découpe pas les variables non quotées (`set -- $f` avec
 `f="2 1"` donne `$1="2 1"`). Utiliser `${=f}` ou éviter les paires. Déjà rencontré en début
 de session sur la boucle `LD_PRELOAD`.
+
+## D49 — M2 et V5 annulées par la mesure (2026-09-04)
+
+### V5 — index O(1) des zones ayant de la place : sans objet
+Instrumentation de `heap_reserve_block` sur 200 000 opérations :
+**1,34 zone parcourue par appel** (`small`), **1,22** (`mixed`). Un index O(1)
+économiserait un tiers d'itération. La première zone de la liste convient presque toujours :
+c'est la plus récemment créée, donc celle qui a de la place. Aucun gisement.
+
+### M2 — réutiliser les résidus LARGE : gisement réel mais **virtuel**
+Profil `large`, état à la fin du workload : 254 zones vivantes, 508 blocs (un résidu par
+zone), **1 577 440 o utiles contre 958 208 o en résidus, soit 37,8 %** de l'empreinte LARGE.
+
+Mais `VmPeak` 5 680 Ko contre `VmHWM` 4 480 Ko : **1 200 Ko mappés et jamais résidents**,
+et les résidus sont très majoritairement là-dedans. `ftm_block_split` n'écrit que l'en-tête
+du résidu (32 o, une ligne de cache) ; les kilo-octets suivants ne sont jamais touchés, donc
+le noyau ne leur attribue aucune page physique. **Le gaspillage est de l'espace d'adressage
+virtuel, pas de la mémoire réelle.**
+
+Et le récupérer coûterait le cache : servir une 2e allocation depuis le résidu remet deux
+allocations dans une zone LARGE, donc libérer l'une ne la rend plus « fully free », donc
+elle n'entre plus dans le cache. C'est le mécanisme que le pas A a supprimé, mesuré en
+[[D29]] (1212 contre 1031 ns/op à l'époque) et dont le cache vaut aujourd'hui **×37** sur ce
+profil.
+
+**Décision : M2 abandonnée.** Échanger un mécanisme qui vaut ×37 contre de l'adressage
+virtuel gratuit sur 64 bits n'a pas de sens.
+
+**Réserve** : ce raisonnement dépend du 64 bits. Sur i386 (KFS-3), un mégaoctet d'espace
+d'adressage sur 4 Go n'est plus négligeable et l'arbitrage pourrait s'inverser. Noté dans
+`perf-hors-sujet.md`.
+
+## D50 — Banc de mesure `bench/` pour la soutenance (2026-09-04)
+
+Trois pièces : des **drapeaux d'ablation** dans `ftm_config.h`, `bench/run.sh` (médianes),
+`bench/Makefile` (orchestration).
+
+**Drapeaux** : `FTM_ENABLE_LARGE_CACHE`, `FTM_ENABLE_ZONE_MAP`, `FTM_ENABLE_LARGE_FASTPATH`.
+Implémentés en **macros de façade** (`FTM_CACHE_TAKE/PUT`, `FTM_MAP_INSERT/REMOVE/ACTIVE`,
+`FTM_SCANS_ZONES`) et non en `#if` dans le corps des fonctions : le code métier reste
+identique et lisible. Astuce : désactivé, `FTM_CACHE_PUT(zone)` renvoie la zone elle-même,
+donc `if (evicted == NULL) return;` tombe droit sur la destruction — le comportement « sans
+cache » émerge sans branchement conditionnel. Les cinq combinaisons compilent.
+
+**Cibles** : `demo` (la séquence de soutenance), `ablation` (désactive une optimisation à la
+fois), `sweep-m` / `sweep-cache` / `sweep-map` / `sweep-fit` (justifier les valeurs
+retenues), `everything`. Chaque cible se termine par `restore` (rebuild depuis
+`Makefile.cfg`), et les flags passent en **variable de ligne de commande**
+(`CMOREFLAGS=...`), qui prime sur `Makefile.cfg` sans l'écraser. `run.sh` vérifie la
+présence de la `.so` avant de mesurer — la garde issue de D48.
+
+**Sortie de `demo`** (RUNS=3, OPS=100000, machine chargée) :
+
+```
+                                    small     mixed     large    calloc     VmPeak
+glibc (par defaut)                  13.69     40.11     53.74    123.56    4368 KB
+glibc (meme contrainte mmap)      3719.36   3369.28   3776.58   3806.11    4764 KB
+ft_malloc (etat initial)            49.49     60.29   2981.86   3389.70    4864 KB
+ft_malloc (final)                   58.71     73.82     91.02    211.24    5684 KB
+```
+
+La ligne « même contrainte mmap » est plus forte qu'anticipé : la glibc s'effondre sur
+**tous** les profils, pas seulement `large` — 3719 ns sur `small` contre 59 pour nous.
+
+**Limite à connaître** : `tests/Makefile` a ses propres `CFLAGS` et ne lit pas
+`CMOREFLAGS`. L'archive de test est donc toujours construite dans la configuration de
+référence ; un « 16/16 » sous ablation ne valide pas la variante. Sans conséquence pour le
+banc (qui passe par `LD_PRELOAD`), mais à ne pas mal lire.
+
+**Point à savoir défendre** : `small` et `mixed` sont *meilleurs* à l'état initial (49 et 60
+contre 59 et 74) — c'est le coût de M1, assumé : 4 % de vitesse contre 20 % de mémoire sur
+les zones TINY (D47).
+
+### D50 (suite) — banc appliqué, et une piste qu'il produit immédiatement
+
+Appliqué au dépôt : drapeaux d'ablation dans `include/ftm_config.h`, six substitutions par
+macros de façade dans `src/core/ftm_heap.c`, `bench/run.sh` et `bench/Makefile` créés.
+Les cinq combinaisons d'ablation compilent, 16/16 tests, `LD_PRELOAD` OK sur ls / git /
+python3, 18 symboles publics inchangés.
+
+**Sortie de `make -C bench ablation`** (RUNS=3, OPS=100000) :
+
+| variante                 | small | mixed |   large |  calloc | VmPeak  |
+|--------------------------|------:|------:|--------:|--------:|---------|
+| référence                |  59,1 |  74,9 | **101,9** |   222,8 | 5684 Ko |
+| sans cache LARGE         |  73,4 |  79,4 |  5017,5 |  4885,8 | 5080 Ko |
+| sans page map            |  **53,3** |  **62,2** |   953,6 |  1172,9 | 5684 Ko |
+| sans fast-path LARGE     |  59,3 |  72,5 |   631,0 |   794,5 | 5284 Ko |
+| sans rien (état initial) |  50,1 |  70,2 |  2986,7 |  3552,8 | 4864 Ko |
+
+**Deux enseignements immédiats.**
+
+1. **« Sans rien » (2987) bat « sans cache » seul (5017)** — l'antagonisme de [[D28]]/[[D29]]
+   rendu visible en une ligne : retirer le cache en gardant le fast-path donne le pire des
+   deux mondes, ni cache explicite ni cache accidentel. Excellente démonstration pour la
+   soutenance.
+
+2. **PISTE NOUVELLE — la page map coûte sur `small` et `mixed`.** Désactivée, ils gagnent
+   **10 %** (59,1 → 53,3) et **17 %** (74,9 → 62,2) ; elle ne paie que sur `large`. Logique :
+   pour deux zones TINY, un parcours linéaire bat un hachage, et l'insertion/retrait de
+   chaque page à la création de zone coûte. **Idée à mesurer** : n'indexer que les zones
+   LARGE, et laisser `ftm_heap_find_zone` retomber sur le parcours linéaire pour TINY/SMALL
+   (leurs listes font 1 à 2 éléments, cf. D49). Gain potentiel : 10-17 % sur small/mixed
+   sans rien perdre sur large. Le banc a produit cette piste dès sa première utilisation.
+
+**Nettoyage au passage** : `Makefile.cfg` traînait `-DFTM_LARGE_CACHE_FIT_NUM=4
+-DFTM_LARGE_CACHE_FIT_DEN=1`, reliquat d'expérience contredisant [[D48]]. Le banc n'en était
+pas affecté (il passe ses propres `CMOREFLAGS` en ligne de commande, qui priment sur
+`Makefile.cfg`), mais le build quotidien tournait avec un fit factor de 4. Reconfiguré à
+`--cflags="-DFTM_SMALL_MAX=2048"`.
+
+**Note** : `FTM_ZONE_MAP_CAPACITY` vaut **2048** dans le code, alors que D38 avait retenu
+4096. Marge ×2,2 au lieu de ×4,4 sur la charge observée — viable, mais moins de coussin
+avant la désactivation. À trancher.

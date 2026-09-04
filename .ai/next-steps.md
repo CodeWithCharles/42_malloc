@@ -1,32 +1,48 @@
 # Prochains petits pas
 
-## Session du 2026-09-04 : TERMINÉE
-Voir `state.md` pour le bilan chiffré et `decisions.md` D28→D46 pour le détail.
-Résultat : `small` ×3,2, `mixed` ×2,9, `large` ×37,5, `calloc` ×25. 16/16 tests.
+## La liste d'optimisations est ÉPUISÉE (2026-09-04)
 
-## À faire tout de suite
-1. **Commiter** le travail restant (V1 est commité ; la correction libft ne l'est pas).
-   ⚠️ `thirdparty/libft` est un **sous-module** : il faut commiter DANS le sous-module
-   (Makefile `-O2`, `ft_memset.c`, `ft_memcpy.c`) puis mettre à jour la référence dans
-   le dépôt parent.
-2. **Le stash V2** (`git stash list`) contient les free lists ségrégées, annulées en D44.
-   Le garder ou le jeter — il ne sert que si un profil très fragmenté apparaît un jour.
-3. Vérifier `LD_PRELOAD` sur `ls` / `python3` / `git` / `vim` après la correction libft.
+Douze pistes évaluées, **quatre retenues, huit annulées par la mesure**.
 
-## Pistes restantes (cf. `perf-roadmap.md`)
-- **M1** — supprimer `request_size` en stockant le delta dans les bits 32-63 de `flags`
-  (cf. **D42**) : en-tête 48 → 32, zone TINY 5 → 4 pages (−20 %), **sans perdre**
-  l'affichage de la taille demandée. C'est la piste restante la plus rentable.
-- **M2** — réutiliser les résidus des zones LARGE (jusqu'à 4 Ko/zone).
-- **M3** — `FIT_FACTOR` 2 → 1,5 (un `--cflags`, non mesuré).
-- **V5** — index O(1) des zones ayant de la place (gain jugé faible : 2 zones TINY).
-- ~~V2~~ annulée (D44), ~~V4~~ sans objet (D45), ~~étape 3~~ annulée (D39),
-  ~~madvise~~ repoussée (D36), ~~cache TINY/SMALL~~ abandonnée (D32).
+### Retenues
+| # | Optimisation | Effet |
+|---|---|---|
+| — | Cache de zones LARGE + page map O(1) | `large` ×37 (D31) |
+| V1 | Zones cachées conservées dans la page map | `large` −33 % (D43) |
+| — | libft recompilée `-O2` + `memset`/`memcpy` mot à mot | `calloc` ×25, `mixed` −24 % (D45) |
+| M1 | En-tête 48 → 32 via le delta dans `flags` | zone TINY −20 %, densité +10 % (D47) |
 
-## Rendu 42 — arguments de soutenance
-Cf. `perf-hors-sujet.md` pour ce qui casse le sujet et pourquoi.
-Le point fort de la session est **méthodologique** : sur huit pistes évaluées, cinq ont été
-annulées ou redirigées **par la mesure**, dont trois qui semblaient évidentes. Les deux qui
-ont payé supprimaient des **syscalls** ou des **cache miss**, jamais une complexité
-algorithmique. Et le plus gros gain de la journée (`calloc` ×25) n'était pas une
-optimisation mais **un bug de build** : la libft compilée en `-O0`.
+### Annulées, chacune avec ses chiffres
+`cache TINY/SMALL` (D32) · `madvise` (D36) · `boundary tags` (D39) · `free lists ségrégées`
+(D44) · `calloc sans memset` (D45) · `FIT_FACTOR` dans les deux sens (D48) ·
+`résidus LARGE / M2` (D49) · `index O(1) des zones / V5` (D49)
+
+## Banc de mesure (D50)
+`make -C bench demo` — la séquence à montrer en soutenance.
+`make -C bench ablation` — ce que chaque optimisation apporte, une à une.
+`make -C bench sweep-m|sweep-cache|sweep-map|sweep-fit` — justifier chaque valeur retenue.
+Régler la durée avec `RUNS=3 OPS=100000` pour une démo en direct.
+⚠️ Vérifier `uptime` avant toute campagne : au-dessus de 0,2 de charge les mesures dérivent.
+
+## À faire
+1. **Commiter.** ⚠️ Deux dépôts : d'abord DANS `thirdparty/libft` (Makefile `-O2`,
+   `ft_memset.c`, `ft_memcpy.c`), puis la référence du sous-module dans le parent.
+2. Vérifier que `include/ftm_config.h` est bien revenu à `FIT_NUM 2` / `FIT_DEN 1`, et
+   `./configure.sh --cflags="-DFTM_SMALL_MAX=2048"`.
+3. `LD_PRELOAD` sur `ls` / `python3` / `git` / `vim` — dernière validation d'intégration.
+4. Relecture D14 du code ajouté aujourd'hui (noms, commentaires au minimum).
+5. Le `git stash` de V2 (free lists ségrégées) : garder ou jeter.
+
+## Piste rouverte par le banc (D50)
+**N'indexer que les zones LARGE dans la page map.** L'ablation montre que la map coûte
+10 % sur `small` et 17 % sur `mixed` (elle n'y remplace qu'un parcours de 1 à 2 zones) et
+ne paie que sur `large`. `ftm_heap_find_zone` pourrait consulter la map puis retomber sur
+le parcours linéaire — court par construction pour TINY/SMALL. À mesurer avant de coder.
+
+## Si on reprend un jour
+- Sinon, rien de conforme au sujet ne reste sur la table. Tout ce qui subsiste est dans
+  `perf-hors-sujet.md` (tcache, `brk`, `free` sans validation, en-tête 16 o) et casse une
+  contrainte.
+- **M2 redevient pertinent en 32 bits** (KFS-3) : cf. `perf-hors-sujet.md` §6.
+- Le bench mesure mal l'empreinte mémoire (jeu de travail fixe, pas d'écriture dans les
+  blocs). Un profil « mémoire » dédié serait le prérequis à toute future piste mémoire.
